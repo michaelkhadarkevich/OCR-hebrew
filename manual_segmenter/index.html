@@ -1,0 +1,80 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual Segmentation Tool</title>
+  <link rel="stylesheet" href="styles.css?v=20260813-help-button">
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <h1>Manual Segmentation <button id="helpBtn" type="button" class="help-btn" title="How to use">?</button></h1>
+      <div id="helpPanel" class="help-panel" hidden>
+        <div><b>Make box:</b> left-drag on empty image.</div>
+        <div><b>Write:</b> click/select a box, then type.</div>
+        <div><b>Next box:</b> press Enter.</div>
+        <div><b>Delete:</b> select box, press Tab or Delete box.</div>
+        <div><b>Resize:</b> select box, drag small square handles.</div>
+        <div><b>Save:</b> Save page writes PNG + TXT.</div>
+      </div>
+
+      <section class="panel">
+        <div class="label">Page images</div>
+        <div class="button-row no-top">
+          <button id="chooseImagesBtn" type="button">Choose image files</button>
+          <button id="chooseFolderBtn" type="button">Choose image folder</button>
+        </div>
+        <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,image/*" multiple hidden>
+        <input id="folderInput" type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,image/*" webkitdirectory directory multiple hidden>
+        <div class="hint">For your PDF pages, choose: <code>C:\Users\maxim\Downloads\Ariel_manual_pages</code></div>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="pageSelect">Current page</label>
+        <select id="pageSelect"></select>
+        <div id="pageInfo" class="hint">No page loaded.</div>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="transcription">Selected box transcription</label>
+        <textarea id="transcription" dir="auto" rows="5" placeholder="Type transcription for the selected box"></textarea>
+        <div class="button-row">
+          <button id="deleteBtn" type="button">Delete box</button>
+          <button id="toggleBoxTextBtn" type="button">Hide text in boxes</button>
+        </div>
+      </section>
+
+      <section class="panel grow boxes-panel">
+        <div class="label">Boxes on this page</div>
+        <ol id="boxList" class="box-list"></ol>
+      </section>
+
+
+      <section class="panel">
+        <label class="label" for="outputPath">Output folder</label>
+        <input id="outputPath" class="path-input" type="text" value="/home/maxim/HTR-VT/data/arielManual">
+        <div class="button-row">
+          <button id="savePageBtn" type="button">Save page</button>
+        </div>
+        <button id="saveAllBtn" type="button" class="wide">Save all pages</button>
+        <div id="saveInfo" class="hint">Saves directly to this folder: one cropped PNG and one TXT for each box.</div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="toolbar">
+        <button id="prevBtn" type="button">Prev</button>
+        <button id="nextBtn" type="button">Next</button>
+        <label>Zoom <input id="zoomInput" type="range" min="10" max="200" value="50"></label>
+        <span id="status">Load page images to begin.</span>
+      </div>
+      <div id="canvasWrap" class="canvas-wrap">
+        <canvas id="pageCanvas"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=20260813-help-button"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+data/*
+!data/*.py
+output/
+*.pth
+*.pt
+*.ckpt
+*.zip
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
