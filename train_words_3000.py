@@ -16,7 +16,12 @@ from model import HTR_VT
 from utils import utils
 
 
-DATASETS = ("arielOnlyWord", "agadaOnlyWord", "RockOnlyWord")
+DATASETS = (
+    "arielOnlyWord",
+    "agadaOnlyWord",
+    "RockOnlyWord",
+    "phisicsTigulOnlyWords",
+)
 
 
 def parse_args():
@@ -118,7 +123,11 @@ def write_manifest(path, rows):
     with path.open("w", newline="", encoding="utf-8-sig") as handle:
         writer = csv.DictWriter(handle, fieldnames=("dataset", "image", "label_file", "label"))
         writer.writeheader()
-        writer.writerows(rows)
+        for row in rows:
+            portable = dict(row)
+            for field in ("image", "label_file"):
+                portable[field] = Path(os.path.relpath(row[field], Path.cwd())).as_posix()
+            writer.writerow(portable)
 
 
 class WordDataset(Dataset):

@@ -1,5 +1,7 @@
 data/*
 !data/*.py
+!data/phisicsTigulOnlyWords/
+!data/phisicsTigulOnlyWords/**
 output/
 *.pth
 *.pt
