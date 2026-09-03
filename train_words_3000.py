@@ -3,13 +3,14 @@ import csv
 import json
 import os
 import random
+import shutil
 import time
 from collections import Counter
 from pathlib import Path
 
 import editdistance
 import torch
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 from torch.utils.data import DataLoader, Dataset
 
 from model import HTR_VT
@@ -46,6 +47,23 @@ def parse_args():
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--rotation-degrees", type=float, default=0.0)
     parser.add_argument("--rotation-probability", type=float, default=0.5)
+    parser.add_argument("--stretch-factor", type=float, default=0.0)
+    parser.add_argument("--blur-probability", type=float, default=0.0)
+    parser.add_argument("--noise-probability", type=float, default=0.0)
+    parser.add_argument("--train-dirs", type=Path, nargs="+", help="Explicit training folders")
+    parser.add_argument("--test-dir", type=Path, help="Explicit held-out test folder")
+    parser.add_argument("--validation-dir", type=Path, help="Folder to sample validation rows from")
+    parser.add_argument("--validation-size", type=int, default=0)
+    parser.add_argument("--early-stopping-patience", type=int, default=0, help="Evaluations without improvement")
+    parser.add_argument("--lr-plateau-patience", type=int, default=0, help="Evaluations before reducing LR")
+    parser.add_argument("--lr-factor", type=float, default=0.5)
+    parser.add_argument("--resume-checkpoint", type=Path)
+    parser.add_argument("--initial-best-checkpoint", type=Path)
+    parser.add_argument(
+        "--strip-whitespace",
+        action="store_true",
+        help="Remove whitespace from labels (use when spaces are not scored)",
+    )
     parser.add_argument("--no-mirror", action="store_true", help="Do not mirror RTL word images for CTC")
     parser.add_argument("--smoke", action="store_true", help="Run one train/eval step without replacing final outputs")
     return parser.parse_args()
@@ -72,6 +90,31 @@ def collect_samples(data_dir):
             )
     if not samples:
         raise RuntimeError("No paired PNG/TXT word samples were found")
+    return samples
+
+
+def collect_samples_from_dirs(directories, strip_whitespace=False):
+    samples = []
+    for root in directories:
+        for image_path in sorted(root.rglob("*.png")):
+            label_path = image_path.with_suffix(".txt")
+            if not label_path.exists():
+                continue
+            label = label_path.read_text(encoding="utf-8-sig").strip()
+            if strip_whitespace:
+                label = "".join(label.split())
+            if not label:
+                continue
+            samples.append(
+                {
+                    "dataset": root.name,
+                    "image": str(image_path.resolve()),
+                    "label_file": str(label_path.resolve()),
+                    "label": label,
+                }
+            )
+    if not samples:
+        raise RuntimeError("No paired PNG/TXT samples were found in the explicit folders")
     return samples
 
 
@@ -140,6 +183,9 @@ class WordDataset(Dataset):
         augment=False,
         rotation_degrees=0.0,
         rotation_probability=0.5,
+        stretch_factor=0.0,
+        blur_probability=0.0,
+        noise_probability=0.0,
     ):
         self.samples = samples
         self.width = width
@@ -148,6 +194,9 @@ class WordDataset(Dataset):
         self.augment = augment
         self.rotation_degrees = rotation_degrees
         self.rotation_probability = rotation_probability
+        self.stretch_factor = stretch_factor
+        self.blur_probability = blur_probability
+        self.noise_probability = noise_probability
 
     def __len__(self):
         return len(self.samples)
@@ -174,12 +223,19 @@ class WordDataset(Dataset):
                 image = ImageEnhance.Contrast(image).enhance(random.uniform(0.8, 1.2))
             if random.random() < 0.25:
                 image = ImageEnhance.Brightness(image).enhance(random.uniform(0.9, 1.1))
+            if self.stretch_factor > 0:
+                scale = random.uniform(1.0 - self.stretch_factor, 1.0 + self.stretch_factor)
+                image = image.resize((max(1, round(image.width * scale)), image.height), Image.Resampling.BILINEAR)
+            if random.random() < self.blur_probability:
+                image = image.filter(ImageFilter.GaussianBlur(radius=random.uniform(0.2, 0.7)))
         new_width = min(self.width, max(1, round(image.width * self.height / image.height)))
         image = image.resize((new_width, self.height), Image.Resampling.BILINEAR)
         canvas = Image.new("L", (self.width, self.height), 255)
         canvas.paste(image, (0, 0))
         pixels = torch.frombuffer(bytearray(canvas.tobytes()), dtype=torch.uint8).clone()
         tensor = pixels.reshape(self.height, self.width).unsqueeze(0).float().div_(255.0)
+        if self.augment and random.random() < self.noise_probability:
+            tensor = (tensor + torch.randn_like(tensor) * random.uniform(0.005, 0.02)).clamp_(0.0, 1.0)
         return tensor, item["label"], item["dataset"], item["image"]
 
 
@@ -286,12 +342,40 @@ def main():
 
     run_dir = args.out_dir / ("smoke" if args.smoke else "run")
     run_dir.mkdir(parents=True, exist_ok=True)
-    all_samples = collect_samples(args.data_dir)
-    train_samples, test_samples = split_samples(
-        all_samples, args.test_size, args.seed, args.fixed_test_manifest
-    )
+    final_test_samples = None
+    if args.train_dirs or args.test_dir:
+        if not args.train_dirs or not args.test_dir:
+            raise ValueError("--train-dirs and --test-dir must be provided together")
+        train_samples = collect_samples_from_dirs(args.train_dirs, args.strip_whitespace)
+        final_test_samples = collect_samples_from_dirs([args.test_dir], args.strip_whitespace)
+        overlap = {item["image"] for item in train_samples} & {item["image"] for item in final_test_samples}
+        if overlap:
+            raise RuntimeError(f"Explicit train/test folders overlap; first: {next(iter(overlap))}")
+        if args.validation_size:
+            if not args.validation_dir:
+                raise ValueError("--validation-dir is required when --validation-size is used")
+            candidates = collect_samples_from_dirs([args.validation_dir], args.strip_whitespace)
+            if args.validation_size >= len(candidates):
+                raise ValueError("Validation size must be smaller than its source folder")
+            validation_rng = random.Random(args.seed)
+            test_samples = validation_rng.sample(candidates, args.validation_size)
+            validation_paths = {item["image"] for item in test_samples}
+            train_samples = [item for item in train_samples if item["image"] not in validation_paths]
+        else:
+            test_samples = final_test_samples
+            final_test_samples = None
+        all_samples = train_samples + test_samples + (final_test_samples or [])
+    else:
+        all_samples = collect_samples(args.data_dir)
+        train_samples, test_samples = split_samples(
+            all_samples, args.test_size, args.seed, args.fixed_test_manifest
+        )
     write_manifest(run_dir / "train_manifest.csv", train_samples)
-    write_manifest(run_dir / "test_manifest.csv", test_samples)
+    write_manifest(run_dir / "validation_manifest.csv", test_samples)
+    if final_test_samples is not None:
+        write_manifest(run_dir / "test_manifest.csv", final_test_samples)
+    else:
+        write_manifest(run_dir / "test_manifest.csv", test_samples)
 
     alphabet = sorted(set("".join(item["label"] for item in all_samples)))
     converter = utils.CTCLabelConverter(alphabet)
@@ -303,6 +387,9 @@ def main():
         augment=True,
         rotation_degrees=args.rotation_degrees,
         rotation_probability=args.rotation_probability,
+        stretch_factor=args.stretch_factor,
+        blur_probability=args.blur_probability,
+        noise_probability=args.noise_probability,
     )
     test_dataset = WordDataset(test_samples, args.width, args.height, not args.no_mirror, augment=False)
     generator = torch.Generator().manual_seed(args.seed)
@@ -324,14 +411,41 @@ def main():
         pin_memory=device.type == "cuda",
         collate_fn=collate,
     )
+    final_test_loader = None
+    if final_test_samples is not None:
+        final_test_dataset = WordDataset(
+            final_test_samples, args.width, args.height, not args.no_mirror, augment=False
+        )
+        final_test_loader = DataLoader(
+            final_test_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=device.type == "cuda",
+            collate_fn=collate,
+        )
 
     model = HTR_VT.create_model(nb_cls=len(alphabet) + 1, img_size=[args.height, args.width]).to(device)
     patch_forward_no_final_logit_norm(model)
-    with torch.no_grad():
-        model.head.bias.zero_()
-        model.head.bias[0] = -2.0
+    resume_checkpoint = None
+    start_step = 0
+    if args.resume_checkpoint:
+        resume_checkpoint = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
+        if resume_checkpoint["alphabet"] != alphabet:
+            raise RuntimeError("Resume checkpoint alphabet does not match the current datasets")
+        model.load_state_dict(resume_checkpoint["model"])
+        start_step = int(resume_checkpoint.get("step", 0))
+    else:
+        with torch.no_grad():
+            model.head.bias.zero_()
+            model.head.bias[0] = -2.0
     criterion = torch.nn.CTCLoss(reduction="mean", zero_infinity=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = None
+    if args.lr_plateau_patience > 0:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode="min", factor=args.lr_factor, patience=args.lr_plateau_patience
+        )
     amp_enabled = device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
@@ -341,12 +455,19 @@ def main():
             "data_dir": str(args.data_dir),
             "out_dir": str(args.out_dir),
             "fixed_test_manifest": str(args.fixed_test_manifest.resolve()),
+            "train_dirs": [str(path.resolve()) for path in args.train_dirs] if args.train_dirs else None,
+            "test_dir": str(args.test_dir.resolve()) if args.test_dir else None,
+            "validation_dir": str(args.validation_dir.resolve()) if args.validation_dir else None,
+            "resume_checkpoint": str(args.resume_checkpoint.resolve()) if args.resume_checkpoint else None,
+            "initial_best_checkpoint": str(args.initial_best_checkpoint.resolve()) if args.initial_best_checkpoint else None,
+            "start_step": start_step,
             "device": str(device),
             "gpu": torch.cuda.get_device_name(0) if device.type == "cuda" else None,
             "torch": torch.__version__,
             "train_samples": len(train_samples),
             "test_samples": len(test_samples),
             "test_by_dataset": dict(Counter(item["dataset"] for item in test_samples)),
+            "final_test_samples": len(final_test_samples) if final_test_samples is not None else None,
             "alphabet": alphabet,
             "mirror": not args.no_mirror,
             "final_logit_norm_removed": True,
@@ -365,13 +486,29 @@ def main():
     best_cer = float("inf")
     best_accuracy = -1.0
     best_step = 0
-    steps = 1 if args.smoke else args.steps
+    if args.initial_best_checkpoint:
+        initial_best = torch.load(args.initial_best_checkpoint, map_location="cpu", weights_only=False)
+        if initial_best["alphabet"] != alphabet:
+            raise RuntimeError("Initial best checkpoint alphabet does not match the current datasets")
+        best_cer = float(initial_best.get("test_cer", float("inf")))
+        best_accuracy = float(initial_best.get("test_word_accuracy", -1.0))
+        best_step = int(initial_best.get("step", 0))
+        shutil.copy2(args.initial_best_checkpoint, run_dir / "best_model.pth")
+        previous_predictions = args.initial_best_checkpoint.with_name("best_predictions.csv")
+        if previous_predictions.exists():
+            shutil.copy2(previous_predictions, run_dir / "best_predictions.csv")
+    evaluations_without_improvement = 0
+    completed_steps = 0
+    final_step = start_step + 1 if args.smoke else args.steps
+    if final_step <= start_step:
+        raise ValueError("--steps must be greater than the resume checkpoint step")
     iterator = iter(train_loader)
     start_time = time.time()
 
     try:
         model.train()
-        for step in range(1, steps + 1):
+        for step in range(start_step + 1, final_step + 1):
+            completed_steps = step
             try:
                 images, labels, _, _ = next(iterator)
             except StopIteration:
@@ -386,7 +523,7 @@ def main():
             scaler.step(optimizer)
             scaler.update()
 
-            if step % args.eval_every == 0 or step == steps:
+            if step % args.eval_every == 0 or step == final_step:
                 result = evaluate(model, test_loader, converter, criterion, device, amp_enabled)
                 elapsed = time.time() - start_time
                 row = {
@@ -419,13 +556,28 @@ def main():
                         run_dir / "best_model.pth",
                     )
                     save_predictions(run_dir / "best_predictions.csv", result["predictions"])
+                    evaluations_without_improvement = 0
+                else:
+                    evaluations_without_improvement += 1
+                if scheduler is not None:
+                    scheduler.step(result["cer"])
                 print(
-                    f"step={step}/{steps} train_loss={float(loss.detach()):.5f} "
+                    f"step={step}/{final_step} train_loss={float(loss.detach()):.5f} "
                     f"test_loss={result['loss']:.5f} test_CER={result['cer']:.5f} "
                     f"test_word_acc={result['word_accuracy']:.3f} best_step={best_step} "
                     f"best_CER={best_cer:.5f} elapsed={elapsed:.1f}s",
                     flush=True,
                 )
+                if (
+                    args.early_stopping_patience > 0
+                    and evaluations_without_improvement >= args.early_stopping_patience
+                ):
+                    print(
+                        f"early_stopping step={step} best_step={best_step} "
+                        f"evaluations_without_improvement={evaluations_without_improvement}",
+                        flush=True,
+                    )
+                    break
     finally:
         metrics_handle.close()
 
@@ -433,7 +585,7 @@ def main():
         {
             "model": model.state_dict(),
             "alphabet": alphabet,
-            "step": steps,
+            "step": completed_steps,
             "best_step": best_step,
             "best_test_cer": best_cer,
             "best_test_word_accuracy": best_accuracy,
@@ -441,11 +593,20 @@ def main():
         },
         run_dir / "last_model.pth",
     )
+    final_test_result = None
+    if final_test_loader is not None:
+        best_checkpoint = torch.load(run_dir / "best_model.pth", map_location=device, weights_only=False)
+        model.load_state_dict(best_checkpoint["model"])
+        final_test_result = evaluate(model, final_test_loader, converter, criterion, device, amp_enabled)
+        save_predictions(run_dir / "final_test_predictions.csv", final_test_result["predictions"])
+
     summary = {
-        "completed_steps": steps,
+        "completed_steps": completed_steps,
         "best_step": best_step,
-        "best_test_cer": best_cer,
-        "best_test_word_accuracy": best_accuracy,
+        "best_validation_cer": best_cer,
+        "best_validation_line_accuracy": best_accuracy,
+        "final_test_cer": final_test_result["cer"] if final_test_result else None,
+        "final_test_line_accuracy": final_test_result["word_accuracy"] if final_test_result else None,
         "elapsed_seconds": time.time() - start_time,
     }
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
