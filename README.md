@@ -1,4 +1,4 @@
-# HTR-VT for Hebrew handwriting
+# HTR-VT for Hebrew Handwriting
 
 This repository adapts the official [HTR-VT](https://github.com/Intellindust-AI-Lab/HTR-VT) implementation to offline Hebrew handwriting recognition. We compare three training granularities:
 
@@ -6,7 +6,7 @@ This repository adapts the official [HTR-VT](https://github.com/Intellindust-AI-
 2. full text lines only;
 3. a combined set of words and lines.
 
-The base source was compared with upstream commit `f21bf20` (22 January 2026). The Hebrew data pipeline, manual annotation interface, experiment runners, resumable checkpoints, evaluation scripts and plots are our additions. Training data, model checkpoints and generated outputs are intentionally excluded from Git.
+The base source was compared with upstream commit `f21bf20` (22 January 2026). The Hebrew data pipeline, manual annotation interface, experiment runners, resumable checkpoints, evaluation scripts and plots are our additions. Curated data that was already committed remains available in the repository; newly generated local data, model checkpoints and run outputs are excluded from Git.
 
 ## Model and Hebrew preprocessing
 
@@ -57,6 +57,19 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
 Use the PyTorch wheel appropriate for your CUDA driver. Full training requires a CUDA GPU.
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `data/` | Paired handwriting images and UTF-8 transcriptions |
+| `manual_segmenter/` | Browser-based line and word annotation tool |
+| `train.py` | Original training entry point |
+| `run_paper_recipe_experiments.ps1`, `train_words_3000.py` | Resumable experiment orchestration and the extended training loop |
+| `evaluate_line_folder.py` | Held-out line-level evaluation |
+| `evaluate_training_cer.py` | CER evaluation on the training sources stored in a checkpoint |
+| `plot_training_curves.py` | English training, validation and comparison plots |
+| `output/` | Local checkpoints, metrics and plots; ignored by Git |
 
 ## Experiment flows
 
@@ -120,7 +133,7 @@ These historical runs are not a perfectly controlled ablation because their batc
 
 During verification we found that an earlier implementation of chunked paper-style training used the end of each chunk, rather than the global target step, as the cosine-schedule horizon. The code in this repository now uses the global `--steps` value. Metrics created by the earlier chunk-local implementation must not be described as a faithful reproduction; rerun the paper-style script to regenerate corrected results.
 
-See [harmonit_final_test_report.md](harmonit_final_test_report.md) for the detailed baseline evaluation.
+See [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for the detailed baseline evaluation and its limitations.
 
 ## Adapting to another handwriting style
 

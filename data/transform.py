@@ -181,7 +181,7 @@ class RandomTransform:
         br_right = fd(min(w * 3 / 4 - bl_left, dw))
 
         tform = stf.ProjectiveTransform()
-        tform.estimate(np.array((        #从对应点估计变换矩阵
+        tform.estimate(np.array((        # Estimate the transform from corresponding points.
             (tl_left, tl_top),
             (bl_left, h - bl_bottom),
             (w - br_right, h - br_bottom),
