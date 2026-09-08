@@ -31,7 +31,9 @@ DATASETS = (
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train HTR-VT on the three Hebrew word datasets")
+    parser = argparse.ArgumentParser(
+        description="Train HTR-VT on Hebrew word, line, or combined datasets"
+    )
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--out-dir", type=Path, default=Path("output/hebrew_words_3000"))
     parser.add_argument("--steps", type=int, default=3000)

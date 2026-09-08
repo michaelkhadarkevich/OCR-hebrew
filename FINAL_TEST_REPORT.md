@@ -14,7 +14,9 @@ SHA-256 hashes of the 32 final-test images were compared with every other image 
 
 - Final-test images: 32
 - Identical images found elsewhere: 0
-- Result: no image overlap or detected leakage into the final test
+- Result: no byte-identical final-test images were found elsewhere in the repository
+
+This hash check detects exact file duplicates. It does not by itself rule out related crops or different images originating from the same source page, so page-level separation remains the stronger safeguard.
 
 ## Evaluated checkpoints
 
@@ -64,9 +66,9 @@ These three results were independently verified with `evaluate_line_folder.py`. 
 ## Interpretation and limitations
 
 1. The 20,000-step lines-plus-words checkpoint is the strongest available model.
-2. Exposure to complete lines is important when the evaluation input is a complete line.
+2. In our experiments, exposure to complete lines was strongly beneficial when the evaluation input was a complete line.
 3. In the available experiments, sufficiently trained mixed data produced the best final-test result.
-4. The historical three-way comparison is not a perfectly controlled ablation: batch sizes and training budgets differ between some runs. It supports an empirical trend, but does not prove that mixed data alone caused the improvement.
+4. The historical three-way comparison is not a perfectly controlled ablation. All three central runs used batch size 16, but their training-step budgets, dataset sizes and effective numbers of epochs differ. The comparison supports an empirical trend, but does not prove that mixed data alone caused the improvement.
 5. The final test contains only 32 lines, so the reported percentages have substantial sampling uncertainty.
 6. A 3.07% CER is a strong project result, but 50.00% exact-line accuracy still calls for human review in a production workflow.
 

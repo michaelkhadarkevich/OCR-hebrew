@@ -1,30 +1,48 @@
-﻿import torch
+"""Load and describe one batch using the same preprocessing as the Hebrew runner."""
+
+import argparse
+from pathlib import Path
+
 from torch.utils.data import DataLoader
-from data import dataset
-from utils import utils
-from model import HTR_VT
+
+from train_words_3000 import WordDataset, collate, collect_samples_from_dirs
 
 
-def collate(batch):
-    images, labels = zip(*batch)
-    images = torch.stack([torch.from_numpy(img).float() for img in images], dim=0)
-    return images, list(labels)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Verify a preprocessed Hebrew HTR batch")
+    parser.add_argument("data_dirs", type=Path, nargs="+")
+    parser.add_argument("--batch-size", type=int, default=4)
+    parser.add_argument("--width", type=int, default=1024)
+    parser.add_argument("--height", type=int, default=64)
+    parser.add_argument("--strip-whitespace", action="store_true")
+    parser.add_argument("--no-mirror", action="store_true")
+    return parser.parse_args()
 
-train_ds = dataset.myLoadDS('data/omer_flipped/train.ln', 'data/omer_flipped/lines/', [512, 64])
-loader = DataLoader(train_ds, batch_size=2, shuffle=False, num_workers=0, collate_fn=collate)
-images, labels = next(iter(loader))
-converter = utils.CTCLabelConverter(train_ds.ralph.values())
-text, lengths = converter.encode(labels)
-model = HTR_VT.create_model(nb_cls=len(train_ds.ralph) + 1, img_size=[64, 512])
-preds = model(images.float()).float()
-preds_size = torch.IntTensor([preds.size(1)] * images.size(0))
-loss = torch.nn.CTCLoss(reduction='mean', zero_infinity=True)(preds.permute(1,0,2).log_softmax(2), text.cpu(), preds_size, lengths.cpu())
-print('batch labels:')
-for label in labels:
-    print(label)
-print('image batch shape:', tuple(images.shape))
-print('pred shape:', tuple(preds.shape))
-print('pred time steps:', preds.size(1))
-print('target lengths:', lengths.tolist())
-print('encoded target total length:', int(text.numel()))
-print('ctc loss:', float(loss.item()))
+
+def main():
+    args = parse_args()
+    samples = collect_samples_from_dirs(args.data_dirs, strip_whitespace=args.strip_whitespace)
+    checked_dataset = WordDataset(
+        samples,
+        width=args.width,
+        height=args.height,
+        mirror=not args.no_mirror,
+    )
+    loader = DataLoader(
+        checked_dataset,
+        batch_size=min(args.batch_size, len(checked_dataset)),
+        shuffle=False,
+        num_workers=0,
+        collate_fn=collate,
+    )
+    images, labels, datasets, paths = next(iter(loader))
+
+    print("Batch shape:", tuple(images.shape))
+    print("Pixel range:", float(images.min()), float(images.max()))
+    print("Mirrored for RTL:", not args.no_mirror)
+    for dataset_name, path, label in zip(datasets, paths, labels):
+        print(f"- dataset={dataset_name} image={Path(path).name} label={label!r}")
+
+
+if __name__ == "__main__":
+    main()

@@ -33,7 +33,13 @@ python manual_segmenter/server.py
 # type the transcriptions, choose an output directory and save.
 ```
 
-The scripts `verify_transcriptions.py`, `verify_training_batch.py` and `verify_visual_ltr.py` help detect missing pairs, incorrect labels and wrong RTL orientation before training.
+The scripts `verify_transcriptions.py`, `verify_training_batch.py` and `verify_visual_ltr.py` help detect missing pairs, empty or invalid UTF-8 labels, and wrong RTL orientation before training. They accept repository-relative dataset paths and do not rely on machine-specific directories:
+
+```powershell
+python verify_transcriptions.py data/HarmonitManualTrain data/HarmonitManualTrainOnlyWord
+python verify_training_batch.py data/HarmonitManualTrain --strip-whitespace
+python verify_visual_ltr.py data/HarmonitManualTrain --output output/rtl_preview.png
+```
 
 Main folders used by the experiments:
 
@@ -119,6 +125,8 @@ python evaluate_training_cer.py `
 
 The experiment runners call `plot_training_curves.py` after completion. The generated plots show training/validation loss and validation CER/accuracy with optimizer steps on the x-axis.
 
+Historical metric CSV files use the legacy column names `test_loss`, `test_cer` and `test_word_accuracy`. In the three main experiment runners these columns describe the **validation** set used for checkpoint selection; `test_word_accuracy` means exact-sample accuracy, which is exact-line accuracy when the samples are complete lines.
+
 ## Verified baseline results
 
 The following selected checkpoints were evaluated independently on the same 32 final-test lines. Spaces are excluded from every metric.
@@ -129,7 +137,11 @@ The following selected checkpoints were evaluated independently on the same 32 f
 | Lines only | 10,000 | 5,821 | 13/32 (40.63%) | 4.33% | 95.67% |
 | Lines + words | 20,000 | 15,341 | **16/32 (50.00%)** | **3.07%** | **96.93%** |
 
-These historical runs are not a perfectly controlled ablation because their batch sizes and training budgets differ. They nevertheless show the main empirical pattern: models exposed to full lines generalize much better to line recognition than word-only models, and sufficiently trained mixed data produced our best checkpoint.
+These historical runs used the same batch size (16), optimizer, learning rate, image size, seed and light-rotation augmentation. They are not a perfectly controlled ablation because the training-step budgets, dataset sizes and effective numbers of epochs differ. They nevertheless show the main empirical pattern: in our experiments, models exposed to full lines performed substantially better on line recognition than the word-only model, and the sufficiently trained mixed dataset produced our best checkpoint.
+
+![Verified final-test comparison](docs/results/verified_final_test_comparison.png)
+
+The figure above reports the same held-out results as the table. A second figure with the recorded validation curves is available at [`docs/results/verified_validation_curves.png`](docs/results/verified_validation_curves.png). The lines-only curve ends at 10,000 steps, while the word-only and mixed runs continue to 20,000; the graph therefore documents the historical runs rather than claiming a step-matched ablation.
 
 During verification we found that an earlier implementation of chunked paper-style training used the end of each chunk, rather than the global target step, as the cosine-schedule horizon. The code in this repository now uses the global `--steps` value. Metrics created by the earlier chunk-local implementation must not be described as a faithful reproduction; rerun the paper-style script to regenerate corrected results.
 
@@ -145,7 +157,7 @@ See [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for the detailed baseline evalu
 6. Evaluate the selected checkpoints once on the final set.
 7. Report CER, exact-line accuracy, dataset sizes and all deviations from the paper.
 
-Absolute CER depends heavily on writer variability, dataset size and segmentation quality. The comparison between matched experiments is more informative than expecting another writer to reproduce our exact percentages.
+Absolute CER depends heavily on writer variability, dataset size and segmentation quality. A future step-matched comparison is more informative for isolating the effect of sample type than expecting another writer to reproduce our exact percentages.
 
 ## References
 
