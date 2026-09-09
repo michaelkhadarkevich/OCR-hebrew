@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Word Segmenter - Auto v3 Punctuation Safe</title>
+  <link rel="stylesheet" href="styles.css?v=20260817-word-auto-v3">
+</head>
+<body>
+  <main class="app">
+    <aside class="sidebar">
+      <h1>Word Segmenter <span class="version-badge">Auto v3</span> <button id="helpBtn" type="button" class="help-btn" title="How to use">?</button></h1>
+      <div id="helpPanel" class="help-panel" hidden>
+        <div><b>Recommended:</b> choose a dataset folder containing matching PNG/JPG + TXT files.</div>
+        <div><b>Automatic mode:</b> with PNG/JPG + TXT pairs, the app can cut every line into words automatically using low-ink vertical gaps.</div>
+        <div><b>Manual correction:</b> left-drag to add a box, resize with handles, or delete a wrong box.</div>
+        <div><b>RTL order:</b> boxes are ordered right-to-left on the same line.</div>
+        <div><b>Auto labels:</b> labels are assigned from the line TXT in Hebrew right-to-left order. Spaces before punctuation do not create fake words.</div>
+        <div><b>Punctuation safety:</b> standalone punctuation is attached to a neighboring word when possible. Punctuation-only or unsafe crops are not saved.</div>
+        <div><b>Edit:</b> select a box and edit its word if needed.</div>
+        <div><b>Resize:</b> drag the small square handles on the selected box.</div>
+        <div><b>Delete:</b> select a box and press Tab, or click Delete word box.</div>
+        <div><b>Save:</b> writes one cropped PNG + one TXT for every word box.</div>
+      </div>
+
+      <section class="panel">
+        <div class="label">Input</div>
+        <div class="button-row no-top">
+          <button id="chooseDatasetFolderBtn" type="button"><b>Choose dataset folder</b></button>
+          <button id="chooseImagesBtn" type="button">Choose images</button>
+        </div>
+        <div class="button-row">
+          <button id="choosePdfBtn" type="button">Choose PDF</button>
+        </div>
+        <input id="datasetFolderInput" type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,.txt,image/*,text/plain" webkitdirectory directory multiple hidden>
+        <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,image/*" multiple hidden>
+        <input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple hidden>
+        <div class="hint"><b>Best for your HTR data:</b> choose the folder that contains pairs such as <code>line_001.png</code> + <code>line_001.txt</code>.</div>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="pageSelect">Current line / page</label>
+        <select id="pageSelect"></select>
+        <div id="pageInfo" class="hint">No image loaded.</div>
+      </section>
+
+      <section class="panel source-panel">
+        <label class="label" for="sourceTranscription">Original line transcription</label>
+        <textarea id="sourceTranscription" dir="rtl" rows="4" placeholder="If a matching TXT file is loaded, its text appears here."></textarea>
+        <div class="button-row">
+          <button id="assignWordsBtn" type="button"><b>Assign words from line TXT</b></button>
+        </div>
+        <div id="wordCountInfo" class="hint">Draw one box around each whole word.</div>
+      </section>
+
+      <section class="panel auto-panel">
+        <div class="label">Automatic word cutting</div>
+        <label class="check-row"><input id="autoAfterLoad" type="checkbox" checked> Auto-cut all lines after loading a dataset folder</label>
+        <div class="hint">Uses the matching TXT to know exactly how many real word tokens should exist. Standalone punctuation such as <code>.</code> or <code>,</code> does not increase the word count. For N usable words it searches for N-1 low-ink gaps and rejects cuts that would isolate a tiny punctuation-only ink region.</div>
+        <div class="auto-grid">
+          <label>Ink threshold
+            <input id="inkThresholdInput" type="number" min="40" max="240" value="145">
+          </label>
+          <label>Max dark pixels in gap
+            <input id="gapInkMaxInput" type="number" min="0" max="20" value="1">
+          </label>
+          <label>Minimum gap width (px)
+            <input id="minGapInput" type="number" min="1" max="80" value="5">
+          </label>
+          <label>Minimum word width (px)
+            <input id="minWordWidthInput" type="number" min="5" max="200" value="14">
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="autoCurrentBtn" type="button"><b>Auto-cut current line</b></button>
+          <button id="autoAllBtn" type="button"><b>Auto-cut ALL</b></button>
+        </div>
+        <button id="clearBoxesBtn" type="button" class="wide">Clear boxes on current line</button>
+        <div id="autoInfo" class="hint">Light notebook grid lines are ignored by the dark-ink threshold. You can still resize/delete any automatic box manually.</div>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="transcription">Selected word</label>
+        <textarea id="transcription" dir="rtl" rows="2" placeholder="Word label"></textarea>
+        <div class="button-row">
+          <button id="deleteBtn" type="button">Delete word box</button>
+          <button id="toggleBoxTextBtn" type="button">Hide text in boxes</button>
+        </div>
+      </section>
+
+      <section class="panel grow boxes-panel">
+        <div class="label">Words on this image</div>
+        <ol id="boxList" class="box-list" dir="rtl"></ol>
+      </section>
+
+      <section class="panel">
+        <label class="label" for="paddingInput">Crop padding (pixels)</label>
+        <input id="paddingInput" type="number" min="0" max="50" value="4">
+        <label class="label top-gap" for="outputPath">Output folder</label>
+        <input id="outputPath" class="path-input" type="text" value="C:\Users\YOUR_USER\Desktop\arielWords">
+        <div class="button-row">
+          <button id="savePageBtn" type="button">Save words</button>
+          <button id="saveNextBtn" type="button"><b>Save + Next</b></button>
+        </div>
+        <button id="saveAllBtn" type="button" class="wide">Save all loaded images</button>
+        <div id="saveInfo" class="hint">Output format: <code>source_word_0001.png</code> + matching <code>.txt</code>. Punctuation-only/unsafe crops are skipped so they cannot corrupt the dataset. The original images are never modified.</div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="toolbar">
+        <button id="prevBtn" type="button">Prev</button>
+        <button id="nextBtn" type="button">Next</button>
+        <label>Zoom <input id="zoomInput" type="range" min="10" max="200" value="80"></label>
+        <span id="status">Load a dataset folder or images to begin.</span>
+      </div>
+      <div id="canvasWrap" class="canvas-wrap">
+        <canvas id="pageCanvas"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js?v=20260817-word-auto-v3"></script>
+</body>
+</html>

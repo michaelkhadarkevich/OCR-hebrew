@@ -10,6 +10,7 @@ output/
 *.log
 __pycache__/
 *.pyc
+tools/segmentation/**/*.pid
 .ipynb_checkpoints/
 .venv/
 hebrew_letter_statistics.xlsx

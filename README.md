@@ -27,6 +27,8 @@ data/<dataset>/sample_0001.txt
 
 We created our Hebrew data manually. We transcribed the source lines, marked line and word regions with the interface in `manual_segmenter/`, exported matching PNG/TXT pairs, and reviewed the exported data for segmentation and transcription errors.
 
+The portable tools used for the page-to-lines-to-words workflow are now available in [`tools/segmentation/`](tools/segmentation/README.md): **Manual Segmenter PDF v4** for drawing and transcribing line crops, and **Word Segmenter Auto v3** for proposing word crops from line PNG/TXT pairs with punctuation handling and manual review. See the linked guide for startup commands and the complete workflow.
+
 ```powershell
 python manual_segmenter/server.py
 # Open http://127.0.0.1:8765, load a page, draw RTL boxes,
