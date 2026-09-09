@@ -14,7 +14,9 @@ The recognition flow is:
 
 `image -> modified ResNet-18 -> 4-layer ViT encoder -> character logits -> CTC decoding`
 
-Images are resized to height 64 and padded to a configured width. For right-to-left Hebrew, each image is mirrored horizontally while its UTF-8 transcription remains in logical reading order. Whitespace is removed from all labels because the model alphabet has no space class. Consequently, the reported CER and exact-line accuracy do not score spaces.
+Images are resized to height 64 and padded to a configured width; images that would exceed that width are compressed horizontally to fit. For right-to-left Hebrew, each image is mirrored horizontally while its UTF-8 transcription remains in logical reading order. The reported Hebrew experiments enable whitespace stripping and have no space class. Consequently, their CER and exact-line accuracy do not score spaces.
+
+The Hebrew training and evaluation entry points remove the final normalization of character logits via `patch_forward_no_final_logit_norm`; the original `model/HTR_VT.py` forward still includes it. This is a model-path adaptation in addition to the data and training changes. Use the Hebrew entry points for these checkpoints. The encoder has four blocks, six attention heads per block and 768-dimensional features.
 
 ## Data preparation
 
@@ -25,14 +27,15 @@ data/<dataset>/sample_0001.png
 data/<dataset>/sample_0001.txt
 ```
 
-We created our Hebrew data manually. We transcribed the source lines, marked line and word regions with the interface in `manual_segmenter/`, exported matching PNG/TXT pairs, and reviewed the exported data for segmentation and transcription errors.
+We transcribed the Hebrew source lines manually and drew line regions, then used the word segmenter to propose word crops from the line images and spaced transcriptions, with manual review and corrections. The workflow exports matching PNG/TXT pairs. Segmentation accuracy has not been measured independently.
 
 The portable tools used for the page-to-lines-to-words workflow are now available in [`tools/segmentation/`](tools/segmentation/README.md): **Manual Segmenter PDF v4** for drawing and transcribing line crops, and **Word Segmenter Auto v3** for proposing word crops from line PNG/TXT pairs with punctuation handling and manual review. See the linked guide for startup commands and the complete workflow.
 
 ```powershell
-python manual_segmenter/server.py
-# Open http://127.0.0.1:8765, load a page, draw RTL boxes,
-# type the transcriptions, choose an output directory and save.
+python -m pip install -r tools/segmentation/line_segmenter/requirements.txt
+python tools/segmentation/line_segmenter/server.py
+# Open http://127.0.0.1:8770, load a PDF or page image,
+# mark lines, transcribe them and save to an explicit output directory.
 ```
 
 The scripts `verify_transcriptions.py`, `verify_training_batch.py` and `verify_visual_ltr.py` help detect missing pairs, empty or invalid UTF-8 labels, and wrong RTL orientation before training. They accept repository-relative dataset paths and do not rely on machine-specific directories:
@@ -50,7 +53,9 @@ Main folders used by the experiments:
 - validation/checkpoint selection: `HarmonitManualTest`;
 - final evaluation only: `HarmonitManualFinalTest` (32 lines).
 
-The final set is never used to select a checkpoint. Its labels are also excluded when constructing the model alphabet.
+The central runs select checkpoint steps on validation CER; final-test labels are excluded from their model alphabet. The final set was used to compare multiple trained configurations retrospectively, so the best final-test result is exploratory rather than a once-only test of a preselected winning configuration.
+
+The historical validation split is separated by line, not fully by page: 15 of its 16 source-page identifiers also occur in training. No exact validation-image duplicates or matching validation-line word-crop stems were found in the central training folders. The 32 final-test lines have no byte-identical duplicates elsewhere in `data/` and no source-page identifier overlap with central training or validation. These checks do not establish writer independence. See the [repository audit](docs/results/repository_audit.md).
 
 ## Environment
 
@@ -83,7 +88,7 @@ Use the PyTorch wheel appropriate for your CUDA driver. Full training requires a
 
 ### Adapted baseline
 
-Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4` and light rotation augmentation. The strongest saved baseline was trained on both word and line samples. `run_controlled_words_baseline.ps1` provides a data-matched words-only baseline with the same outer protocol as the paper-style runner.
+Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotation, and random contrast/brightness changes. The strongest evaluated baseline was trained on both word and line samples. The historical comparison below uses batch size 16. `run_controlled_words_baseline.ps1` defines a separate batch-size-8 words-only comparison with the paper-style runner; its existing local run is incomplete (last metric at step 600), and it is not the words-only model in the results table.
 
 ### Paper-style recipe
 
@@ -92,17 +97,19 @@ Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4` and light rot
 - SAM over AdamW (`rho=0.05`);
 - peak learning rate `1e-3`, 1,000-step warm-up and cosine decay to `1e-7`;
 - weight decay `0.5`;
-- EMA decay `0.9999`;
-- span masking ratio `0.4`, maximum span length 8;
+- EMA decay cap `0.9999`, with the implementation's update-dependent ramp;
+- span masking parameter `0.4`, span length 8 (overlapping sampled spans mean the actual masked fraction can be lower);
 - projective, erosion/dilation, color-jitter and elastic augmentations, each sampled with probability 0.5.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\run_paper_recipe_experiments.ps1
+powershell -ExecutionPolicy Bypass -File .\run_paper_recipe_experiments.ps1 -OutputRoot .\output\corrected_recipe_v1
 ```
 
-The runner closes cleanly after each data-loader epoch and resumes from a full-state checkpoint containing the raw model, optimizer, EMA and random-generator states. Splitting into chunks does not change the global learning-rate horizon. If the machine stops, execute the same command again to resume.
+The current runner closes cleanly after each data-loader epoch and resumes from a full-state checkpoint containing the raw model, optimizer, EMA and random-generator states. Splitting into chunks does not change the global learning-rate horizon. Execute the same command and output root to resume a compatible checkpoint. A failure before the first saved checkpoint restarts that initial chunk. Historical weights-only checkpoints do not support full-state continuation in the current runner.
 
-`run_paper_recipe_experiments_to_30000.ps1` optionally continues completed 20,000-step runs to 30,000 in separate output directories. This continuation changes the cosine horizon and should be reported as a separate follow-up experiment, not as a from-scratch 30,000-step reproduction.
+The existing paper-style 20,000/30,000-step results predate two fixes: the global cosine horizon and an EMA forward-method binding bug. With the old binding, validation executed the raw model while the saved best state came from the EMA copy. These logs cannot establish a correct implementation of the intended recipe. The corrected runner records `training_recipe_version=global-cosine-bound-ema-v1`, rejects legacy recipe checkpoints/results, and supports a fresh `-OutputRoot`; it does not overwrite or silently accept the old experiments. No corrected full-length paper-style comparison has been completed as part of this audit.
+
+`run_paper_recipe_experiments_to_30000.ps1 -OutputRoot .\output\corrected_recipe_v1` optionally continues compatible completed 20,000-step runs to 30,000 in separate output directories. This continuation changes the cosine horizon and should be reported as a separate follow-up experiment, not as a from-scratch 30,000-step reproduction.
 
 The paper used a substantially larger training budget; therefore these are paper-style, compute-adapted experiments rather than an exact reproduction.
 
@@ -117,7 +124,7 @@ python evaluate_line_folder.py `
   --output-dir output/<run>_final
 ```
 
-Calculate CER on the training folders recorded in a checkpoint:
+Calculate CER on the current contents of the training folders recorded in a checkpoint. This helper does not reconstruct samples excluded by a historical split; for example, on the regularized run it would include the 12 lines held out from those folders. Do not label such a result as CER on the exact historical training set:
 
 ```powershell
 python evaluate_training_cer.py `
@@ -139,7 +146,7 @@ The following selected checkpoints were evaluated independently on the same 32 f
 | Lines only (continued; numerical failure late in training) | 20,000 | 5,821 | 13/32 (40.63%) | 4.33% | 95.67% |
 | Lines + words | 20,000 | 15,341 | **16/32 (50.00%)** | **3.07%** | **96.93%** |
 
-These historical runs used the same batch size (16), optimizer, learning rate, image size, seed and light-rotation augmentation, and all reached a recorded step count of 20,000. They are not a perfectly controlled ablation: dataset sizes and effective numbers of epochs differ, and the lines-only continuation suffered numerical failure. They nevertheless show the main empirical pattern: in our experiments, models exposed to full lines performed substantially better on line recognition than the word-only model, and the sufficiently trained mixed dataset produced our best checkpoint.
+These historical runs used the same batch size (16), optimizer, learning rate, image size, seed and rotation/contrast/brightness augmentation, and all reached a recorded step count of 20,000. They are not a perfectly controlled ablation: dataset sizes and effective numbers of epochs differ, and the lines-only continuation suffered numerical failure. They nevertheless show the main empirical pattern: in our experiments, models exposed to full lines performed substantially better on line recognition than the word-only model, and the sufficiently trained mixed dataset produced our best checkpoint.
 
 Correction (9 September 2026): the earlier summary omitted `output/manual_lines_10000_rotation_continued_20000/run`, which resumed the 10,000-step lines-only baseline and reached step 20,000 using our adapted recipe, not the paper-style recipe. Its best checkpoint remained at step 5,821 and is byte-identical to the earlier best checkpoint, so final-test metrics are unchanged. Training loss first became nonfinite at step 18,159; the last checkpoint at step 20,000 contains nonfinite model tensors. Thus 20,000 is the recorded run length, not 20,000 healthy training updates. See the [audit](docs/results/lines_only_continuation_audit.md).
 
@@ -147,7 +154,7 @@ Correction (9 September 2026): the earlier summary omitted `output/manual_lines_
 
 The figure above reports the same held-out results as the table. A second figure with the recorded validation curves is available at [`docs/results/verified_validation_curves.png`](docs/results/verified_validation_curves.png). All curves include records through step 20,000. The lines-only continuation and its numerical failure are included explicitly; the figure does not imply equally successful training across the three runs.
 
-During verification we found that an earlier implementation of chunked paper-style training used the end of each chunk, rather than the global target step, as the cosine-schedule horizon. The code in this repository now uses the global `--steps` value. Metrics created by the earlier chunk-local implementation must not be described as a faithful reproduction; rerun the paper-style script to regenerate corrected results.
+The paper-style scheduler and EMA issues described above are separate from the baseline table: these three baseline runs use neither EMA nor the warm-up/cosine schedule. Fresh inference on 9 September 2026 reproduced all three displayed final-test results after the EMA binding fix.
 
 See [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for the detailed baseline evaluation and its limitations.
 

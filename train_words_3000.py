@@ -8,6 +8,7 @@ import shutil
 import time
 from collections import Counter
 from pathlib import Path
+from types import MethodType
 
 import editdistance
 import numpy as np
@@ -28,6 +29,8 @@ DATASETS = (
     "RockOnlyWord",
     "phisicsTigulOnlyWords",
 )
+
+TRAINING_RECIPE_VERSION = "global-cosine-bound-ema-v1"
 
 
 def parse_args():
@@ -312,20 +315,23 @@ def collate(batch):
     return torch.stack(images), list(labels), list(datasets), list(paths)
 
 
-def patch_forward_no_final_logit_norm(model):
-    def forward(x, mask_ratio=0.0, max_span_length=1, use_masking=False):
-        x = model.layer_norm(x)
-        x = model.patch_embed(x)
-        batch, channels, _, _ = x.shape
-        x = x.view(batch, channels, -1).permute(0, 2, 1)
-        if use_masking:
-            x = model.random_masking(x, mask_ratio, max_span_length)
-        x = x + model.pos_embed
-        for block in model.blocks:
-            x = block(x)
-        return model.head(model.norm(x))
+def forward_no_final_logit_norm(self, x, mask_ratio=0.0, max_span_length=1, use_masking=False):
+    x = self.layer_norm(x)
+    x = self.patch_embed(x)
+    batch, channels, _, _ = x.shape
+    x = x.view(batch, channels, -1).permute(0, 2, 1)
+    if use_masking:
+        x = self.random_masking(x, mask_ratio, max_span_length)
+    x = x + self.pos_embed
+    for block in self.blocks:
+        x = block(x)
+    return self.head(self.norm(x))
 
-    model.forward = forward
+
+def patch_forward_no_final_logit_norm(model):
+    # A closure over model survives deepcopy unchanged and makes an EMA copy
+    # execute the raw model. A bound method is rebound to the copied instance.
+    model.forward = MethodType(forward_no_final_logit_norm, model)
 
 
 def ctc_loss(
@@ -603,6 +609,13 @@ def main():
     start_step = 0
     if args.resume_checkpoint:
         resume_checkpoint = torch.load(args.resume_checkpoint, map_location=device, weights_only=False)
+        if (args.ema_decay > 0 or args.warm_up_steps > 0) and (
+            resume_checkpoint.get("config", {}).get("training_recipe_version") != TRAINING_RECIPE_VERSION
+        ):
+            raise RuntimeError(
+                "This checkpoint predates the verified EMA/global-cosine recipe. "
+                "Start a fresh run in a new output directory; resuming it cannot repair historical training."
+            )
         if resume_checkpoint["alphabet"] != alphabet:
             raise RuntimeError("Resume checkpoint alphabet does not match the current datasets")
         model.load_state_dict(resume_checkpoint["model"])
@@ -664,6 +677,7 @@ def main():
     configuration = vars(args).copy()
     configuration.update(
         {
+            "training_recipe_version": TRAINING_RECIPE_VERSION,
             "data_dir": str(args.data_dir),
             "out_dir": str(args.out_dir),
             "fixed_test_manifest": str(args.fixed_test_manifest.resolve()),
@@ -938,6 +952,7 @@ def main():
         save_predictions(run_dir / "final_test_predictions.csv", final_test_result["predictions"])
 
     summary = {
+        "training_recipe_version": TRAINING_RECIPE_VERSION,
         "status": "complete" if training_complete else "checkpointed",
         "completed_steps": completed_steps,
         "target_steps": args.steps,

@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import json
 import os
 from pathlib import Path
 
@@ -27,10 +28,20 @@ LOCAL_RUNS = {
         Path("output/manual_lines_plus_words_continued_20000/run/metrics.csv"),
     ],
 }
+LOCAL_FINAL_EVALUATIONS = {
+    "Words only": Path("output/only_words_four_datasets_20000_rotation/final_test_recheck"),
+    "Lines only": Path("output/harmonit_final_test_all_models/manual_lines_10000_rotation_continued_20000_run_best_model.pth"),
+    "Lines + words": Path("output/harmonit_final_test_all_models/manual_lines_plus_words_continued_20000_run_best_model.pth"),
+}
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate verified public HTR result figures")
+    parser.add_argument(
+        "--verify-local-sources",
+        action="store_true",
+        help="Check published values against local metrics, summaries and final predictions",
+    )
     parser.add_argument(
         "--refresh-curves-from-output",
         action="store_true",
@@ -42,6 +53,50 @@ def parse_args():
 def read_csv(path):
     with path.open("r", newline="", encoding="utf-8-sig") as handle:
         return list(csv.DictReader(handle))
+
+
+def verify_local_sources():
+    import editdistance
+
+    for row in read_csv(FINAL_RESULTS):
+        label = row["training_data"]
+        directory = LOCAL_FINAL_EVALUATIONS[label]
+        summary = json.loads((directory / "summary.json").read_text(encoding="utf-8-sig"))
+        predictions = read_csv(directory / "predictions.csv")
+        pairs = [("".join(r["truth"].split()), "".join(r["prediction"].split())) for r in predictions]
+        edits = sum(editdistance.eval(truth, prediction) for truth, prediction in pairs)
+        characters = sum(len(truth) for truth, _ in pairs)
+        exact = sum(truth == prediction for truth, prediction in pairs)
+        assert int(row["total_lines"]) == len(pairs) == summary["lines"], label
+        assert int(row["exact_lines"]) == exact == summary["compact_exact_lines"], label
+        assert int(row["best_step"]) == summary["checkpoint_step"], label
+        assert abs(edits / characters - summary["compact_cer"]) < 1e-12, label
+        assert abs(100 * edits / characters - float(row["final_test_cer_percent"])) <= 0.0051, label
+        assert abs(100 * exact / len(pairs) - float(row["exact_line_accuracy_percent"])) <= 0.0051, label
+        run_summary = json.loads(LOCAL_RUNS[label][-1].with_name("summary.json").read_text())
+        assert int(row["training_steps"]) == run_summary["completed_steps"], label
+
+    committed_rows = read_csv(CURVES)
+    committed = {(r["training_data"], int(r["step"])): r for r in committed_rows}
+    assert len(committed) == len(committed_rows), "Duplicate published curve steps"
+    expected = {}
+    for label, paths in LOCAL_RUNS.items():
+        for path in paths:
+            for row in read_csv(path):
+                step = int(row["step"])
+                if step != 1 and step % 100:
+                    continue
+                key = label, step
+                assert key not in expected, f"Duplicate source step: {key}"
+                expected[key] = row
+    assert committed.keys() == expected.keys(), "Published/source curve steps differ"
+    for key, source in expected.items():
+        for published_field, source_field in (
+            ("validation_cer_percent", "test_cer"),
+            ("validation_exact_line_accuracy_percent", "test_word_accuracy"),
+        ):
+            assert abs(float(committed[key][published_field]) - 100 * float(source[source_field])) < 1e-9, key
+    print("Verified final metrics and every published curve point against local sources.")
 
 
 def refresh_curves():
@@ -144,6 +199,8 @@ def main():
         raise FileNotFoundError(
             f"Missing {CURVES}. Run once with --refresh-curves-from-output on the training machine."
         )
+    if args.verify_local_sources:
+        verify_local_sources()
     plot_final_results()
     plot_validation_curves()
     print(f"Generated verified result figures in {RESULTS_DIR}")

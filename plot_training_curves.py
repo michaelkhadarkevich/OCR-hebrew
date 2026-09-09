@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import os
 from pathlib import Path
 
@@ -42,7 +43,7 @@ def plot_single(label, metrics, destination):
     axes[1].plot(
         metrics["step"],
         metrics["validation_accuracy"],
-        label="Exact-line accuracy",
+        label="Exact-sample accuracy",
         linewidth=2,
     )
     axes[1].set_title(f"{label}: validation metrics")
@@ -73,10 +74,17 @@ def main():
         if "=" not in specification:
             raise ValueError(f"Expected LABEL=RUN_DIR, got {specification!r}")
         label, raw_path = specification.split("=", 1)
+        safe_label = "_".join(label.lower().split())
         run_dir = Path(raw_path)
+        config_path = run_dir / "config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8-sig")) if config_path.exists() else {}
+        if (config.get("ema_decay", 0) > 0 or config.get("warm_up_steps", 0) > 0) and (
+            config.get("training_recipe_version") != "global-cosine-bound-ema-v1"
+        ):
+            print(f"WARNING: {run_dir} predates EMA/schedule verification; historical metrics only.")
+            label += " [legacy protocol]"
         metrics = read_metrics(run_dir / "metrics.csv")
         runs.append((label, metrics))
-        safe_label = "_".join(label.lower().split())
         plot_single(label, metrics, args.output_dir / f"{safe_label}_curves.png")
 
     figure, axes = plt.subplots(1, 2, figsize=(13, 4.8))
@@ -88,7 +96,7 @@ def main():
     axes[0].set_title("Validation CER comparison")
     axes[0].set_xlabel("Steps")
     axes[0].set_ylabel("CER (%)")
-    axes[1].set_title("Validation exact-line accuracy comparison")
+    axes[1].set_title("Validation exact-sample accuracy comparison")
     axes[1].set_xlabel("Steps")
     axes[1].set_ylabel("Accuracy (%)")
     for axis in axes:

@@ -18,7 +18,7 @@ def compact(text):
 
 @torch.inference_mode()
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate a word checkpoint on a folder of labeled lines")
+    parser = argparse.ArgumentParser(description="Evaluate an HTR checkpoint on recursively stored labeled lines")
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -26,7 +26,7 @@ def main():
     args = parser.parse_args()
 
     samples = []
-    for image in sorted(args.data_dir.glob("*.png")):
+    for image in sorted(args.data_dir.rglob("*.png")):
         label_file = image.with_suffix(".txt")
         if not label_file.exists():
             continue

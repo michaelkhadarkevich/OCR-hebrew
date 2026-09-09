@@ -6,8 +6,11 @@ These figures summarize the three central AdamW baseline experiments described i
 - `verified_validation_curves.png` shows the recorded validation CER against optimizer steps after the first 1,000 steps. The highly unstable initialization interval is omitted explicitly so that differences during the useful part of training remain visible. The curves are downsampled to keep the repository small.
 - `verified_baseline_results.csv` contains the values used in the final-test figure.
 - `verified_validation_curves.csv` contains the downsampled values used in the validation figure.
+- `repository_audit.md` records the 9 September audit, including data splits, run provenance and the EMA bug affecting historical paper-style logs.
 
-The historical comparison is not a fully controlled ablation. All three runs used batch size 16, AdamW, learning rate `5e-4`, weight decay `1e-4`, image size 64x1024, seed 123 and light rotation, and all reached recorded step 20,000. Dataset sizes differ, and the lines-only continuation suffered numerical failure: its first nonfinite training loss occurs at step 18,159. The selected best checkpoint remains step 5,821. The previous figure omitted this continuation; the corrected curve includes it. See the [checkpoint and log audit](lines_only_continuation_audit.md).
+The curve CSV samples step 1 and every 100th step; the figure displays steps from 1,000 onward. A selected best checkpoint can fall between plotted points, so the lowest visible point need not equal the recorded best validation CER.
+
+The historical comparison is not a fully controlled ablation. All three runs used batch size 16, AdamW, learning rate `5e-4`, weight decay `1e-4`, image size 64x1024, seed 123 and rotation/contrast/brightness augmentation, and all reached recorded step 20,000. Dataset sizes differ, and the lines-only continuation suffered numerical failure: its first nonfinite training loss occurs at step 18,159. The selected best checkpoint remains step 5,821. The previous figure omitted this continuation; the corrected curve includes it. See the [checkpoint and log audit](lines_only_continuation_audit.md).
 
 Regenerate the figures from the committed CSV files:
 
@@ -21,4 +24,10 @@ To rebuild the downsampled validation CSV from the original local run outputs be
 python scripts/generate_public_results.py --refresh-curves-from-output
 ```
 
-The historical paper-style graphs are deliberately excluded because those stored runs predate the cosine-scheduler correction documented in the main README.
+Verify every committed curve point and final metric against the local logs and predictions:
+
+```powershell
+python scripts/generate_public_results.py --verify-local-sources
+```
+
+The historical paper-style graphs are deliberately excluded because those stored runs predate the cosine-scheduler and EMA-forward corrections documented in the main README. Replotting their CSV files cannot repair the experiments; the general plotting tool marks such inputs `[legacy protocol]`.

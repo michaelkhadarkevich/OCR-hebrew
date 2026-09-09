@@ -1,3 +1,5 @@
+param([string]$OutputRoot = ".\output")
+
 $ErrorActionPreference = "Stop"
 
 $python = ".\.venv\Scripts\python.exe"
@@ -38,6 +40,9 @@ function Initialize-Continuation {
     }
     $sourceSummaryPath = Join-Path $SourceDirectory "run\summary.json"
     $sourceSummary = Get-Content -LiteralPath $sourceSummaryPath -Raw | ConvertFrom-Json
+    if ($sourceSummary.training_recipe_version -ne "global-cosine-bound-ema-v1") {
+        throw "Source run uses the legacy EMA/schedule implementation. First train corrected runs under a fresh -OutputRoot."
+    }
     if ($sourceSummary.status -ne "complete" -or [int]$sourceSummary.completed_steps -ne 20000) {
         throw "The source run is not a complete 20,000-step run: $SourceDirectory"
     }
@@ -59,6 +64,9 @@ function Continue-Experiment {
         $summaryPath = Join-Path $OutputDirectory "run\summary.json"
         if (Test-Path -LiteralPath $summaryPath) {
             $existingSummary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if ($existingSummary.training_recipe_version -ne "global-cosine-bound-ema-v1") {
+                throw "Legacy EMA/schedule results exist in $OutputDirectory. Use corrected runs under a fresh -OutputRoot."
+            }
             if (
                 [int]$existingSummary.target_steps -eq $targetSteps -and
                 [int]$existingSummary.completed_steps -ge $targetSteps
@@ -103,25 +111,25 @@ $lineDirectories = @(
 
 Continue-Experiment `
     "words only" `
-    ".\output\paper_recipe_words_only_20000" `
-    ".\output\paper_recipe_words_only_30000" `
+    (Join-Path $OutputRoot "paper_recipe_words_only_20000") `
+    (Join-Path $OutputRoot "paper_recipe_words_only_30000") `
     $wordDirectories
 Continue-Experiment `
     "lines only" `
-    ".\output\paper_recipe_lines_only_20000" `
-    ".\output\paper_recipe_lines_only_30000" `
+    (Join-Path $OutputRoot "paper_recipe_lines_only_20000") `
+    (Join-Path $OutputRoot "paper_recipe_lines_only_30000") `
     $lineDirectories
 Continue-Experiment `
     "lines and words" `
-    ".\output\paper_recipe_lines_plus_words_20000" `
-    ".\output\paper_recipe_lines_plus_words_30000" `
+    (Join-Path $OutputRoot "paper_recipe_lines_plus_words_20000") `
+    (Join-Path $OutputRoot "paper_recipe_lines_plus_words_30000") `
     ($lineDirectories + $wordDirectories)
 
 & $python ".\plot_training_curves.py" `
-    --run "Words only=output\paper_recipe_words_only_30000\run" `
-    --run "Lines only=output\paper_recipe_lines_only_30000\run" `
-    --run "Lines + words=output\paper_recipe_lines_plus_words_30000\run" `
-    --output-dir ".\output\paper_recipe_three_experiments_30000\graphs"
+    --run "Words only=$OutputRoot\paper_recipe_words_only_30000\run" `
+    --run "Lines only=$OutputRoot\paper_recipe_lines_only_30000\run" `
+    --run "Lines + words=$OutputRoot\paper_recipe_lines_plus_words_30000\run" `
+    --output-dir (Join-Path $OutputRoot "paper_recipe_three_experiments_30000\graphs")
 if ($LASTEXITCODE -ne 0) {
     throw "Graph generation failed with exit code $LASTEXITCODE"
 }

@@ -1,3 +1,5 @@
+param([string]$OutputRoot = ".\output")
+
 $ErrorActionPreference = "Stop"
 
 $python = ".\.venv\Scripts\python.exe"
@@ -39,6 +41,9 @@ function Run-Experiment {
         $summaryPath = Join-Path $OutputDirectory "run\summary.json"
         if (Test-Path -LiteralPath $summaryPath) {
             $existingSummary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
+            if ($existingSummary.training_recipe_version -ne "global-cosine-bound-ema-v1") {
+                throw "Legacy EMA/schedule results exist in $OutputDirectory. Use -OutputRoot with a fresh directory; these results cannot be repaired by resuming."
+            }
             if (
                 [int]$existingSummary.target_steps -eq $targetSteps -and
                 [int]$existingSummary.completed_steps -ge $targetSteps
@@ -80,15 +85,18 @@ $lineDirectories = @(
     ".\data\HarmonitManualTrain"
 )
 
-Run-Experiment "words only" ".\output\paper_recipe_words_only_20000" $wordDirectories
-Run-Experiment "lines only" ".\output\paper_recipe_lines_only_20000" $lineDirectories
-Run-Experiment "lines and words" ".\output\paper_recipe_lines_plus_words_20000" ($lineDirectories + $wordDirectories)
+$wordsOutput = Join-Path $OutputRoot "paper_recipe_words_only_20000"
+$linesOutput = Join-Path $OutputRoot "paper_recipe_lines_only_20000"
+$mixedOutput = Join-Path $OutputRoot "paper_recipe_lines_plus_words_20000"
+Run-Experiment "words only" $wordsOutput $wordDirectories
+Run-Experiment "lines only" $linesOutput $lineDirectories
+Run-Experiment "lines and words" $mixedOutput ($lineDirectories + $wordDirectories)
 
 & $python ".\plot_training_curves.py" `
-    --run "Words only=output\paper_recipe_words_only_20000\run" `
-    --run "Lines only=output\paper_recipe_lines_only_20000\run" `
-    --run "Lines + words=output\paper_recipe_lines_plus_words_20000\run" `
-    --output-dir ".\output\paper_recipe_three_experiments\graphs"
+    --run "Words only=$wordsOutput\run" `
+    --run "Lines only=$linesOutput\run" `
+    --run "Lines + words=$mixedOutput\run" `
+    --output-dir (Join-Path $OutputRoot "paper_recipe_three_experiments\graphs")
 if ($LASTEXITCODE -ne 0) {
     throw "Graph generation failed with exit code $LASTEXITCODE"
 }

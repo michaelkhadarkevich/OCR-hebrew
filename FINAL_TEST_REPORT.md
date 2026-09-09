@@ -2,9 +2,13 @@
 
 The original evaluation was performed on 3 September 2026. The three main checkpoints were independently re-evaluated on 7 September 2026, and the four-dataset words-only checkpoint was verified on 8 September 2026.
 
+All three checkpoints in the central baseline comparison were evaluated again on 9 September 2026 after the EMA binding fix; their metrics were unchanged. The [repository audit](docs/results/repository_audit.md) documents the evidence and the distinct problems in historical paper-style runs.
+
 ## Evaluation protocol
 
 All saved HTR checkpoints were compared on the held-out dataset at `data/HarmonitManualFinalTest`. It contains 32 labeled text lines from pages that were not used for training or checkpoint selection.
+
+This report covers the historical baseline checkpoint scan, not every later paper-style or interrupted experiment. Checkpoint steps were selected on validation data, but the final set has been used to compare multiple configurations retrospectively. Calling one configuration the best is therefore an exploratory comparison, not an independent once-only estimate for a configuration chosen before testing.
 
 The model alphabet has no whitespace class. Spaces are therefore removed from both the reference and prediction before all metrics are calculated. Reported CER and exact-line accuracy do not score whitespace.
 
@@ -17,6 +21,8 @@ SHA-256 hashes of the 32 final-test images were compared with every other image 
 - Result: no byte-identical final-test images were found elsewhere in the repository
 
 This hash check detects exact file duplicates. It does not by itself rule out related crops or different images originating from the same source page, so page-level separation remains the stronger safeguard.
+
+The 9 September audit also found no final-test source-page identifier overlap with central training or validation. The historical validation split itself is only line-disjoint: 15 of its 16 page identifiers occur in training. No byte-identical validation images or word crops named as descendants of validation lines were found in the central training folders. This limits interpretation of validation scores and does not invalidate the separate final-set arithmetic.
 
 ## Evaluated checkpoints
 
@@ -37,6 +43,8 @@ The original scan covered 19 `best_model.pth` files, including complete experime
 | Words, rotation | 4,637 | 2/32 | 6.25% | 30.17% | 69.83% |
 | Words, 10,000 steps | 8,584 | 5/32 | 15.63% | 33.52% | 66.48% |
 | Words + Physics | 7,376 | 3/32 | 9.38% | 36.03% | 63.97% |
+
+The regularized row used a different validation protocol: 12 lines sampled from `HarmonitManualTrain`, with early stopping at step 2,040. Its historical `summary.json` field `final_test_cer` refers to the older `HarmonitManualTest` development set, not `HarmonitManualFinalTest`; the table uses its separate final-set evaluation. Older word-run manifests also include removed samples or earlier transcriptions, so those runs cannot be recreated exactly from today's data. Neither issue affects the three central run manifests, which match current labels.
 
 CER is the character error rate, so lower is better. Character accuracy is reported as `1 - CER`.
 
@@ -71,12 +79,13 @@ These three results were independently verified with `evaluate_line_folder.py`. 
 
 ## Interpretation and limitations
 
-1. The 20,000-step lines-plus-words checkpoint is the strongest available model.
+1. The lines-plus-words run reaching 20,000 steps produced the strongest selected checkpoint among these evaluated baselines, saved at step 15,341.
 2. In our experiments, exposure to complete lines was strongly beneficial when the evaluation input was a complete line.
 3. In the available experiments, sufficiently trained mixed data produced the best final-test result.
 4. The historical three-way comparison is not a perfectly controlled ablation. All three central runs used batch size 16 and reached recorded step 20,000, but dataset sizes and effective numbers of epochs differ, and the lines-only continuation suffered numerical failure. The comparison supports an empirical trend, but does not prove that mixed data alone caused the improvement.
 5. The final test contains only 32 lines, so the reported percentages have substantial sampling uncertainty.
 6. A 3.07% CER is a strong project result, but 50.00% exact-line accuracy still calls for human review in a production workflow.
+7. "Character accuracy" in this report means `1 - CER`, an edit-distance-derived score; it is not a separately measured per-position classification accuracy. Insertions are included in CER.
 
 ## Reproducing the evaluation
 
