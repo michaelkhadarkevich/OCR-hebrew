@@ -136,14 +136,16 @@ The following selected checkpoints were evaluated independently on the same 32 f
 | Training data | Training steps | Best step | Exact lines | CER | Character accuracy |
 |---|---:|---:|---:|---:|---:|
 | Words only: four word datasets | 20,000 | 12,086 | 5/32 (15.63%) | 11.31% | 88.69% |
-| Lines only | 10,000 | 5,821 | 13/32 (40.63%) | 4.33% | 95.67% |
+| Lines only (continued; numerical failure late in training) | 20,000 | 5,821 | 13/32 (40.63%) | 4.33% | 95.67% |
 | Lines + words | 20,000 | 15,341 | **16/32 (50.00%)** | **3.07%** | **96.93%** |
 
-These historical runs used the same batch size (16), optimizer, learning rate, image size, seed and light-rotation augmentation. They are not a perfectly controlled ablation because the training-step budgets, dataset sizes and effective numbers of epochs differ. They nevertheless show the main empirical pattern: in our experiments, models exposed to full lines performed substantially better on line recognition than the word-only model, and the sufficiently trained mixed dataset produced our best checkpoint.
+These historical runs used the same batch size (16), optimizer, learning rate, image size, seed and light-rotation augmentation, and all reached a recorded step count of 20,000. They are not a perfectly controlled ablation: dataset sizes and effective numbers of epochs differ, and the lines-only continuation suffered numerical failure. They nevertheless show the main empirical pattern: in our experiments, models exposed to full lines performed substantially better on line recognition than the word-only model, and the sufficiently trained mixed dataset produced our best checkpoint.
+
+Correction (9 September 2026): the earlier summary omitted `output/manual_lines_10000_rotation_continued_20000/run`, which resumed the 10,000-step lines-only baseline and reached step 20,000 using our adapted recipe, not the paper-style recipe. Its best checkpoint remained at step 5,821 and is byte-identical to the earlier best checkpoint, so final-test metrics are unchanged. Training loss first became nonfinite at step 18,159; the last checkpoint at step 20,000 contains nonfinite model tensors. Thus 20,000 is the recorded run length, not 20,000 healthy training updates. See the [audit](docs/results/lines_only_continuation_audit.md).
 
 ![Verified final-test comparison](docs/results/verified_final_test_comparison.png)
 
-The figure above reports the same held-out results as the table. A second figure with the recorded validation curves is available at [`docs/results/verified_validation_curves.png`](docs/results/verified_validation_curves.png). The lines-only curve ends at 10,000 steps, while the word-only and mixed runs continue to 20,000; the graph therefore documents the historical runs rather than claiming a step-matched ablation.
+The figure above reports the same held-out results as the table. A second figure with the recorded validation curves is available at [`docs/results/verified_validation_curves.png`](docs/results/verified_validation_curves.png). All curves include records through step 20,000. The lines-only continuation and its numerical failure are included explicitly; the figure does not imply equally successful training across the three runs.
 
 During verification we found that an earlier implementation of chunked paper-style training used the end of each chunk, rather than the global target step, as the cosine-schedule horizon. The code in this repository now uses the global `--steps` value. Metrics created by the earlier chunk-local implementation must not be described as a faithful reproduction; rerun the paper-style script to regenerate corrected results.
 

@@ -20,7 +20,7 @@ This hash check detects exact file duplicates. It does not by itself rule out re
 
 ## Evaluated checkpoints
 
-The original scan covered 19 `best_model.pth` files, including complete experiments, smoke tests and one partial run. The four-dataset words-only checkpoint was evaluated separately. The table below includes only the 11 substantive training runs; smoke-test checkpoints are excluded because they are not meaningful trained models.
+The original scan covered 19 `best_model.pth` files, including complete experiments, smoke tests and one partial run. The four-dataset words-only checkpoint was evaluated separately. The table below includes 11 substantive result entries; smoke-test checkpoints are excluded because they are not meaningful trained models. The lines-only entry includes its continuation to step 20,000, which retained the same best checkpoint as the initial 10,000-step phase.
 
 ## Results from completed runs
 
@@ -28,7 +28,7 @@ The original scan covered 19 `best_model.pth` files, including complete experime
 |---|---:|---:|---:|---:|---:|
 | Lines + words, continued to 20,000 steps | 15,341 | **16/32** | **50.00%** | **3.07%** | **96.93%** |
 | Regularized | 1,440 | 15/32 | 46.88% | 4.33% | 95.67% |
-| Lines only, 10,000 steps | 5,821 | 13/32 | 40.63% | 4.33% | 95.67% |
+| Lines only, continued to 20,000 steps (late numerical failure) | 5,821 | 13/32 | 40.63% | 4.33% | 95.67% |
 | Lines + words, 10,000 steps | 9,762 | 7/32 | 21.88% | 6.01% | 93.99% |
 | Words only, four datasets, 20,000 steps | 12,086 | 5/32 | 15.63% | 11.31% | 88.69% |
 | Words, rotation, cleaned | 5,443 | 8/32 | 25.00% | 19.41% | 80.59% |
@@ -39,6 +39,12 @@ The original scan covered 19 `best_model.pth` files, including complete experime
 | Words + Physics | 7,376 | 3/32 | 9.38% | 36.03% | 63.97% |
 
 CER is the character error rate, so lower is better. Character accuracy is reported as `1 - CER`.
+
+### Lines-only run-length correction (9 September 2026)
+
+The earlier report incorrectly described lines-only training as ending at 10,000 steps. The adapted-baseline continuation in `output/manual_lines_10000_rotation_continued_20000/run` resumed from step 10,000 and logged every step from 10,001 through 20,000. This is separate from the paper-style runs.
+
+The best model remained at step 5,821: SHA-256 verification confirms that the original and continuation `best_model.pth` files are byte-identical. Its existing final evaluation remains 13/32 exact lines and CER 4.33%; those metrics are not from the last-step checkpoint. Training loss first became nonfinite at step 18,159, and all training losses after step 18,745 are nonfinite. The step-20,000 last checkpoint contains 132 nonfinite model tensors. The continuation therefore reached the requested step counter but did not provide 20,000 healthy updates or a better selected model. See [audit evidence](docs/results/lines_only_continuation_audit.md).
 
 ## Best checkpoint
 
@@ -68,7 +74,7 @@ These three results were independently verified with `evaluate_line_folder.py`. 
 1. The 20,000-step lines-plus-words checkpoint is the strongest available model.
 2. In our experiments, exposure to complete lines was strongly beneficial when the evaluation input was a complete line.
 3. In the available experiments, sufficiently trained mixed data produced the best final-test result.
-4. The historical three-way comparison is not a perfectly controlled ablation. All three central runs used batch size 16, but their training-step budgets, dataset sizes and effective numbers of epochs differ. The comparison supports an empirical trend, but does not prove that mixed data alone caused the improvement.
+4. The historical three-way comparison is not a perfectly controlled ablation. All three central runs used batch size 16 and reached recorded step 20,000, but dataset sizes and effective numbers of epochs differ, and the lines-only continuation suffered numerical failure. The comparison supports an empirical trend, but does not prove that mixed data alone caused the improvement.
 5. The final test contains only 32 lines, so the reported percentages have substantial sampling uncertainty.
 6. A 3.07% CER is a strong project result, but 50.00% exact-line accuracy still calls for human review in a production workflow.
 

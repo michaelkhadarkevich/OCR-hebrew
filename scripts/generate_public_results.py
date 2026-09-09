@@ -18,7 +18,10 @@ FINAL_RESULTS = RESULTS_DIR / "verified_baseline_results.csv"
 CURVES = RESULTS_DIR / "verified_validation_curves.csv"
 LOCAL_RUNS = {
     "Words only": [Path("output/only_words_four_datasets_20000_rotation/run/metrics.csv")],
-    "Lines only": [Path("output/manual_lines_10000_rotation/run/metrics.csv")],
+    "Lines only": [
+        Path("output/manual_lines_10000_rotation/run/metrics.csv"),
+        Path("output/manual_lines_10000_rotation_continued_20000/run/metrics.csv"),
+    ],
     "Lines + words": [
         Path("output/manual_lines_plus_words_10000_rotation/run/metrics.csv"),
         Path("output/manual_lines_plus_words_continued_20000/run/metrics.csv"),
@@ -119,6 +122,9 @@ def plot_validation_curves():
             linewidth=1.8,
         )
     axis.set_title("Validation CER after the first 1,000 optimizer steps")
+    axis.axvline(18159, color="#777777", linestyle="--", linewidth=1)
+    axis.text(18159 - 250, 97, "Lines-only: first nonfinite training loss\nstep 18,159; retained best step 5,821",
+              ha="right", va="top", fontsize=8)
     axis.set_xlabel("Optimizer steps")
     axis.set_ylabel("Validation CER (%) — lower is better")
     axis.set_xlim(left=0)

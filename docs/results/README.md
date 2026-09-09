@@ -7,7 +7,7 @@ These figures summarize the three central AdamW baseline experiments described i
 - `verified_baseline_results.csv` contains the values used in the final-test figure.
 - `verified_validation_curves.csv` contains the downsampled values used in the validation figure.
 
-The historical comparison is not a fully controlled ablation. All three runs used batch size 16, AdamW, learning rate `5e-4`, weight decay `1e-4`, image size 64x1024, seed 123 and light rotation. However, the lines-only run ended at 10,000 steps, the other runs ended at 20,000 steps, and the dataset sizes differ.
+The historical comparison is not a fully controlled ablation. All three runs used batch size 16, AdamW, learning rate `5e-4`, weight decay `1e-4`, image size 64x1024, seed 123 and light rotation, and all reached recorded step 20,000. Dataset sizes differ, and the lines-only continuation suffered numerical failure: its first nonfinite training loss occurs at step 18,159. The selected best checkpoint remains step 5,821. The previous figure omitted this continuation; the corrected curve includes it. See the [checkpoint and log audit](lines_only_continuation_audit.md).
 
 Regenerate the figures from the committed CSV files:
 
