@@ -214,11 +214,11 @@ Use the PyTorch wheel appropriate for your CUDA driver. Full training requires a
 
 ### Adapted baseline
 
-Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotation, and random contrast/brightness changes. The strongest evaluated baseline was trained on both word and line samples. The historical comparison below uses batch size 16. `scripts/runs/run_controlled_words_baseline.ps1` defines a separate batch-size-8 words-only comparison with the paper-style runner; its existing local run is incomplete (last metric at step 600), and it is not the words-only model in the results table.
+Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotation, and random contrast/brightness changes. The strongest evaluated baseline was trained on both word and line samples. The historical comparison below uses batch size 16. `scripts/runs/run_controlled_words_baseline.ps1` defines a separate batch-size-16 words-only comparison with the paper-style runner; its existing local run is incomplete (last metric at step 600), and it is not the words-only model in the results table.
 
 ### Paper-style recipe
 
-`scripts/runs/run_paper_recipe_experiments.ps1` runs words-only, lines-only and combined training for 20,000 steps each. It uses a compute-adapted batch size of 8 and image size 64x1024, while enabling the main training components described in the paper:
+`scripts/runs/run_paper_recipe_experiments.ps1` runs words-only, lines-only and combined training for 20,000 steps each. It uses a compute-adapted batch size of 16 and image size 64x1024, while enabling the main training components described in the paper:
 
 - SAM over AdamW (`rho=0.05`);
 - peak learning rate `1e-3`, 1,000-step warm-up and cosine decay to `1e-7`;

@@ -12,7 +12,7 @@ $trainingDirectories = @(
 )
 $common = @(
     "--steps", "$targetSteps",
-    "--batch-size", "8",
+    "--batch-size", "16",
     "--width", "1024",
     "--height", "64",
     "--eval-every", "100",

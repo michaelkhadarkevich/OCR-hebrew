@@ -7,7 +7,7 @@ $trainer = ".\train_words_3000.py"
 $targetSteps = 30000
 $common = @(
     "--steps", "$targetSteps",
-    "--batch-size", "8",
+    "--batch-size", "16",
     "--width", "1024",
     "--height", "64",
     "--eval-every", "100",

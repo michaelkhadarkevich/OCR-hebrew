@@ -54,7 +54,7 @@ The 32 final-test images have no byte-identical duplicate anywhere else under `d
 
 Correction: the README and final report now distinguish the actual historical split from the recommended future page-disjoint protocol. The final set has also been used retrospectively to compare multiple configurations; the winning final metric is exploratory, not an untouched once-only estimate for a preselected winner.
 
-### 5. A separate batch-size-8 baseline is incomplete
+### 5. A separate batch-size-16 baseline is incomplete
 
 `controlled_baseline_words_only_20000/run` has metrics only through step **600**, no completion summary and no `last_model.pth` full-state checkpoint. The `20000` in the directory name is its target, not evidence of completion. It differs from the published words-only baseline, which is `only_words_four_datasets_20000_rotation/run`, batch size 16, and reached 20,000.
 
