@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import torch
 import skimage
 import os
@@ -7,7 +7,15 @@ from PIL import Image
 from torch.utils.data import Dataset
 from utils import utils
 from data import transform as transform
-from torchvision.transforms import ColorJitter
+try:
+    from torchvision.transforms import ColorJitter
+except Exception:
+    class ColorJitter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __call__(self, image):
+            return image
 
 
 def SameTrCollate(batch, args):
@@ -143,4 +151,3 @@ def cycle_data(iterable):
     while True:
         for x in iterable:
             yield x
-

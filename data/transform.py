@@ -1,11 +1,26 @@
-import itertools
+﻿import itertools
 import cv2
 import numpy as np
 from skimage import transform as stf
 from numpy import random, floor
 from PIL import Image, ImageOps
 from cv2 import erode, dilate, normalize
-from torchvision.transforms import RandomCrop
+try:
+    from torchvision.transforms import RandomCrop
+except Exception:
+    class RandomCrop:
+        def __init__(self, size):
+            self.height, self.width = size
+
+        def __call__(self, image):
+            width, height = image.size
+            crop_w = min(int(self.width), width)
+            crop_h = min(int(self.height), height)
+            if crop_w >= width and crop_h >= height:
+                return image
+            left = int(random.randint(0, width - crop_w + 1)) if width > crop_w else 0
+            top = int(random.randint(0, height - crop_h + 1)) if height > crop_h else 0
+            return image.crop((left, top, left + crop_w, top + crop_h))
 import math
 
 class Dilation:

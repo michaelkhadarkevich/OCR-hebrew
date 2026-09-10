@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import csv
 import json
 import math
@@ -15,7 +15,15 @@ import numpy as np
 import torch
 from PIL import Image, ImageEnhance, ImageFilter
 from torch.utils.data import DataLoader, Dataset
-from torchvision.transforms import ColorJitter
+try:
+    from torchvision.transforms import ColorJitter
+except Exception:
+    class ColorJitter:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __call__(self, image):
+            return image
 
 from data import transform as paper_transform
 from model import HTR_VT

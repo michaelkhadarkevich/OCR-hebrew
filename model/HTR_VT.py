@@ -1,7 +1,41 @@
-import torch
+﻿import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from timm.models.vision_transformer import Mlp, DropPath
+try:
+    from timm.models.vision_transformer import Mlp, DropPath
+except Exception:
+    class DropPath(nn.Module):
+        def __init__(self, drop_prob=0.0):
+            super().__init__()
+            self.drop_prob = float(drop_prob)
+
+        def forward(self, x):
+            if self.drop_prob == 0.0 or not self.training:
+                return x
+            keep_prob = 1 - self.drop_prob
+            shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+            random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+            random_tensor.floor_()
+            return x.div(keep_prob) * random_tensor
+
+    class Mlp(nn.Module):
+        def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
+            super().__init__()
+            out_features = out_features or in_features
+            hidden_features = hidden_features or in_features
+            self.fc1 = nn.Linear(in_features, hidden_features)
+            self.act = act_layer()
+            self.drop1 = nn.Dropout(drop)
+            self.fc2 = nn.Linear(hidden_features, out_features)
+            self.drop2 = nn.Dropout(drop)
+
+        def forward(self, x):
+            x = self.fc1(x)
+            x = self.act(x)
+            x = self.drop1(x)
+            x = self.fc2(x)
+            x = self.drop2(x)
+            return x
 
 import numpy as np
 from model import resnet18
@@ -252,4 +286,3 @@ def create_model(nb_cls, img_size, **kwargs):
                                  norm_layer=partial(nn.LayerNorm, eps=1e-6),
                                  **kwargs)
     return model
-
