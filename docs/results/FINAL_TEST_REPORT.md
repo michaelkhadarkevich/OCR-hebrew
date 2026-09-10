@@ -1,4 +1,4 @@
-# HTR Model Evaluation on ManualFinalTest
+# HTR Model Evaluation on test
 
 The original evaluation was performed on 3 September 2026. The three main checkpoints were independently re-evaluated on 7 September 2026, and the four-dataset words-only checkpoint was verified on 8 September 2026.
 
@@ -6,7 +6,7 @@ All three checkpoints in the central baseline comparison were evaluated again on
 
 ## Evaluation protocol
 
-All saved HTR checkpoints were compared on the held-out dataset at `data/test/ManualFinalTest`. It contains 32 labeled text lines from pages that were not used for training or checkpoint selection.
+All saved HTR checkpoints were compared on the held-out dataset at `data/test`. It contains 32 labeled text lines from pages that were not used for training or checkpoint selection.
 
 This report covers the historical baseline checkpoint scan, not every later paper-style or interrupted experiment. Checkpoint steps were selected on validation data, but the final set has been used to compare multiple configurations retrospectively. Calling one configuration the best is therefore an exploratory comparison, not an independent once-only estimate for a configuration chosen before testing.
 
@@ -44,7 +44,7 @@ The original scan covered 19 `best_model.pth` files, including complete experime
 | Words, 10,000 steps | 8,584 | 5/32 | 15.63% | 33.52% | 66.48% |
 | Words + Physics | 7,376 | 3/32 | 9.38% | 36.03% | 63.97% |
 
-The regularized row used a different validation protocol: 12 lines sampled from `HarmonitManualTrain`, with early stopping at step 2,040. Its historical `summary.json` field `final_test_cer` refers to the older `ManualTest` development set, not `ManualFinalTest`; the table uses its separate final-set evaluation. Older word-run manifests also include removed samples or earlier transcriptions, so those runs cannot be recreated exactly from today's data. Neither issue affects the three central run manifests, which match current labels.
+The regularized row used a different validation protocol: 12 lines sampled from `HarmonitManualTrain`, with early stopping at step 2,040. Its historical `summary.json` field `final_test_cer` refers to the older `valid` development set, not `test`; the table uses its separate final-set evaluation. Older word-run manifests also include removed samples or earlier transcriptions, so those runs cannot be recreated exactly from today's data. Neither issue affects the three central run manifests, which match current labels.
 
 CER is the character error rate, so lower is better. Character accuracy is reported as `1 - CER`.
 
@@ -103,7 +103,7 @@ Evaluate any selected checkpoint with:
 ```powershell
 python scripts/evaluation/evaluate_line_folder.py `
   --checkpoint output/<run>/run/best_model.pth `
-  --data-dir data/test/ManualFinalTest `
+  --data-dir data/test `
   --output-dir output/<run>_final
 ```
 
