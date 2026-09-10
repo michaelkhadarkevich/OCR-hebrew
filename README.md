@@ -78,21 +78,21 @@ Use the PyTorch wheel appropriate for your CUDA driver. Full training requires a
 | `data/` | Paired handwriting images and UTF-8 transcriptions |
 | `manual_segmenter/` | Browser-based line and word annotation tool |
 | `train.py` | Original training entry point |
-| `run_paper_recipe_experiments.ps1`, `train_words_3000.py` | Resumable experiment orchestration and the extended training loop |
-| `evaluate_line_folder.py` | Held-out line-level evaluation |
-| `evaluate_training_cer.py` | CER evaluation on the training sources stored in a checkpoint |
-| `plot_training_curves.py` | English training, validation and comparison plots |
+| `scripts/runs/run_paper_recipe_experiments.ps1`, `train_words_3000.py` | Resumable experiment orchestration and the extended training loop |
+| `scripts/evaluation/evaluate_line_folder.py` | Held-out line-level evaluation |
+| `scripts/evaluation/evaluate_training_cer.py` | CER evaluation on the training sources stored in a checkpoint |
+| `scripts/analysis/plot_training_curves.py` | English training, validation and comparison plots |
 | `output/` | Local checkpoints, metrics and plots; ignored by Git |
 
 ## Experiment flows
 
 ### Adapted baseline
 
-Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotation, and random contrast/brightness changes. The strongest evaluated baseline was trained on both word and line samples. The historical comparison below uses batch size 16. `run_controlled_words_baseline.ps1` defines a separate batch-size-8 words-only comparison with the paper-style runner; its existing local run is incomplete (last metric at step 600), and it is not the words-only model in the results table.
+Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotation, and random contrast/brightness changes. The strongest evaluated baseline was trained on both word and line samples. The historical comparison below uses batch size 16. `scripts/runs/run_controlled_words_baseline.ps1` defines a separate batch-size-8 words-only comparison with the paper-style runner; its existing local run is incomplete (last metric at step 600), and it is not the words-only model in the results table.
 
 ### Paper-style recipe
 
-`run_paper_recipe_experiments.ps1` runs words-only, lines-only and combined training for 20,000 steps each. It uses a compute-adapted batch size of 8 and image size 64x1024, while enabling the main training components described in the paper:
+`scripts/runs/run_paper_recipe_experiments.ps1` runs words-only, lines-only and combined training for 20,000 steps each. It uses a compute-adapted batch size of 8 and image size 64x1024, while enabling the main training components described in the paper:
 
 - SAM over AdamW (`rho=0.05`);
 - peak learning rate `1e-3`, 1,000-step warm-up and cosine decay to `1e-7`;
@@ -102,14 +102,14 @@ Our baseline uses AdamW, learning rate `5e-4`, weight decay `1e-4`, light rotati
 - projective, erosion/dilation, color-jitter and elastic augmentations, each sampled with probability 0.5.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\run_paper_recipe_experiments.ps1 -OutputRoot .\output\corrected_recipe_v1
+powershell -ExecutionPolicy Bypass -File .\scripts/runs/run_paper_recipe_experiments.ps1 -OutputRoot .\output\corrected_recipe_v1
 ```
 
 The current runner closes cleanly after each data-loader epoch and resumes from a full-state checkpoint containing the raw model, optimizer, EMA and random-generator states. Splitting into chunks does not change the global learning-rate horizon. Execute the same command and output root to resume a compatible checkpoint. A failure before the first saved checkpoint restarts that initial chunk. Historical weights-only checkpoints do not support full-state continuation in the current runner.
 
 The existing paper-style 20,000/30,000-step results predate two fixes: the global cosine horizon and an EMA forward-method binding bug. With the old binding, validation executed the raw model while the saved best state came from the EMA copy. These logs cannot establish a correct implementation of the intended recipe. The corrected runner records `training_recipe_version=global-cosine-bound-ema-v1`, rejects legacy recipe checkpoints/results, and supports a fresh `-OutputRoot`; it does not overwrite or silently accept the old experiments. No corrected full-length paper-style comparison has been completed as part of this audit.
 
-`run_paper_recipe_experiments_to_30000.ps1 -OutputRoot .\output\corrected_recipe_v1` optionally continues compatible completed 20,000-step runs to 30,000 in separate output directories. This continuation changes the cosine horizon and should be reported as a separate follow-up experiment, not as a from-scratch 30,000-step reproduction.
+`scripts/runs/run_paper_recipe_experiments_to_30000.ps1 -OutputRoot .\output\corrected_recipe_v1` optionally continues compatible completed 20,000-step runs to 30,000 in separate output directories. This continuation changes the cosine horizon and should be reported as a separate follow-up experiment, not as a from-scratch 30,000-step reproduction.
 
 The paper used a substantially larger training budget; therefore these are paper-style, compute-adapted experiments rather than an exact reproduction.
 
@@ -118,7 +118,7 @@ The paper used a substantially larger training budget; therefore these are paper
 Evaluate a selected checkpoint on the final line set:
 
 ```powershell
-python evaluate_line_folder.py `
+python scripts/evaluation/evaluate_line_folder.py `
   --checkpoint output/<run>/run/best_model.pth `
   --data-dir data/HarmonitManualFinalTest `
   --output-dir output/<run>_final
@@ -127,12 +127,12 @@ python evaluate_line_folder.py `
 Calculate CER on the current contents of the training folders recorded in a checkpoint. This helper does not reconstruct samples excluded by a historical split; for example, on the regularized run it would include the 12 lines held out from those folders. Do not label such a result as CER on the exact historical training set:
 
 ```powershell
-python evaluate_training_cer.py `
+python scripts/evaluation/evaluate_training_cer.py `
   --checkpoint output/<run>/run/best_model.pth `
   --output-dir output/<run>_train
 ```
 
-The experiment runners call `plot_training_curves.py` after completion. The generated plots show training/validation loss and validation CER/accuracy with optimizer steps on the x-axis.
+The experiment runners call `scripts/analysis/plot_training_curves.py` after completion. The generated plots show training/validation loss and validation CER/accuracy with optimizer steps on the x-axis.
 
 Historical metric CSV files use the legacy column names `test_loss`, `test_cer` and `test_word_accuracy`. In the three main experiment runners these columns describe the **validation** set used for checkpoint selection; `test_word_accuracy` means exact-sample accuracy, which is exact-line accuracy when the samples are complete lines.
 
@@ -165,7 +165,7 @@ The figure above reports the same held-out results as the table. A second figure
 
 The paper-style scheduler and EMA issues described above are separate from the baseline table: these three baseline runs use neither EMA nor the warm-up/cosine schedule. Fresh inference on 9 September 2026 reproduced all three displayed final-test results after the EMA binding fix.
 
-See [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for the detailed baseline evaluation and its limitations.
+See [docs/results/FINAL_TEST_REPORT.md](docs/results/FINAL_TEST_REPORT.md) for the detailed baseline evaluation and its limitations.
 
 ## Adapting to another handwriting style
 

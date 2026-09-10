@@ -45,7 +45,7 @@ def parse_args():
     parser.add_argument(
         "--fixed-test-manifest",
         type=Path,
-        default=Path("fixed_hebrew_test_words.csv"),
+        default=Path("data/manifests/fixed_hebrew_test_words.csv"),
         help="Persistent test split reused across runs; created once when missing",
     )
     parser.add_argument("--eval-every", type=int, default=1)
