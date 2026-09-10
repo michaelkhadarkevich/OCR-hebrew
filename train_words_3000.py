@@ -80,6 +80,11 @@ def parse_args():
     parser.add_argument("--elastic-magnitude", type=int, default=2)
     parser.add_argument("--checkpoint-every", type=int, default=1000)
     parser.add_argument(
+        "--numerical-diagnostics",
+        action="store_true",
+        help="Log per-step loss/gradient/AMP diagnostics and stop at the first non-finite loss",
+    )
+    parser.add_argument(
         "--chunk-epochs",
         type=int,
         default=0,
@@ -718,6 +723,27 @@ def main():
     metrics_writer.writeheader()
     metrics_writer.writerows(preserved_metric_rows)
     metrics_handle.flush()
+    diagnostics_handle = None
+    diagnostics_writer = None
+    if args.numerical_diagnostics:
+        diagnostics_handle = (run_dir / "numerical_diagnostics.csv").open(
+            "w", newline="", encoding="utf-8-sig"
+        )
+        diagnostics_writer = csv.DictWriter(
+            diagnostics_handle,
+            fieldnames=(
+                "step",
+                "loss",
+                "gradient_norm",
+                "gradient_finite",
+                "amp_scale",
+                "lr",
+                "datasets",
+                "paths",
+            ),
+        )
+        diagnostics_writer.writeheader()
+        diagnostics_handle.flush()
 
     best_cer = float("inf")
     best_accuracy = -1.0
@@ -772,10 +798,10 @@ def main():
         for step in range(start_step + 1, final_step + 1):
             completed_steps = step
             try:
-                images, labels, _, _ = next(iterator)
+                images, labels, batch_datasets, batch_paths = next(iterator)
             except StopIteration:
                 iterator = iter(train_loader)
-                images, labels, _, _ = next(iterator)
+                images, labels, batch_datasets, batch_paths = next(iterator)
 
             if args.warm_up_steps > 0:
                 current_lr = cosine_learning_rate(
@@ -797,6 +823,21 @@ def main():
                 max_span_length=args.max_span_length,
                 use_masking=args.mask_ratio > 0,
             )
+            if args.numerical_diagnostics and not torch.isfinite(loss):
+                failure = {
+                    "step": step,
+                    "stage": "forward_loss",
+                    "loss": str(float(loss.detach())),
+                    "amp_scale": float(scaler.get_scale()),
+                    "lr": float(optimizer.param_groups[0]["lr"]),
+                    "datasets": batch_datasets,
+                    "paths": batch_paths,
+                    "labels": labels,
+                }
+                (run_dir / "numerical_failure.json").write_text(
+                    json.dumps(failure, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                raise RuntimeError(f"Non-finite training loss at step {step}")
             if args.optimizer == "sam":
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
@@ -828,7 +869,22 @@ def main():
             else:
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                if diagnostics_writer is not None:
+                    diagnostics_writer.writerow(
+                        {
+                            "step": step,
+                            "loss": f"{float(loss.detach()):.10g}",
+                            "gradient_norm": f"{float(gradient_norm):.10g}",
+                            "gradient_finite": bool(torch.isfinite(gradient_norm)),
+                            "amp_scale": f"{float(scaler.get_scale()):.10g}",
+                            "lr": f"{optimizer.param_groups[0]['lr']:.10g}",
+                            "datasets": "|".join(batch_datasets),
+                            "paths": "|".join(batch_paths),
+                        }
+                    )
+                    if step % 100 == 0:
+                        diagnostics_handle.flush()
                 scaler.step(optimizer)
                 scaler.update()
 
@@ -922,6 +978,8 @@ def main():
                     break
     finally:
         metrics_handle.close()
+        if diagnostics_handle is not None:
+            diagnostics_handle.close()
 
     atomic_torch_save(
         training_checkpoint_payload(

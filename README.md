@@ -150,6 +150,15 @@ These historical runs used the same batch size (16), optimizer, learning rate, i
 
 Correction (9 September 2026): the earlier summary omitted `output/manual_lines_10000_rotation_continued_20000/run`, which resumed the 10,000-step lines-only baseline and reached step 20,000 using our adapted recipe, not the paper-style recipe. Its best checkpoint remained at step 5,821 and is byte-identical to the earlier best checkpoint, so final-test metrics are unchanged. Training loss first became nonfinite at step 18,159; the last checkpoint at step 20,000 contains nonfinite model tensors. Thus 20,000 is the recorded run length, not 20,000 healthy training updates. See the [audit](docs/results/lines_only_continuation_audit.md).
 
+Follow-up (10 September 2026): a fresh lines-only run with explicit per-step
+numerical diagnostics completed all 20,000 steps without a nonfinite loss. Its
+selected checkpoint was step 11,648 (validation CER 2.13%) and achieved 3.35%
+CER (24/716 edits) with 15/32 exact lines on the final set. The old failure
+therefore did not recur, but one successful repeat does not establish its root
+cause. This post-audit result is reported as supplementary diagnostic evidence
+and does not silently replace the original three-run comparison. See the
+[diagnostic rerun report](docs/results/lines_only_diagnostic_rerun.md).
+
 ![Verified final-test comparison](docs/results/verified_final_test_comparison.png)
 
 The figure above reports the same held-out results as the table. A second figure with the recorded validation curves is available at [`docs/results/verified_validation_curves.png`](docs/results/verified_validation_curves.png). All curves include records through step 20,000. The lines-only continuation and its numerical failure are included explicitly; the figure does not imply equally successful training across the three runs.

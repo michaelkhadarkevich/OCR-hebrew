@@ -54,6 +54,15 @@ The earlier report incorrectly described lines-only training as ending at 10,000
 
 The best model remained at step 5,821: SHA-256 verification confirms that the original and continuation `best_model.pth` files are byte-identical. Its existing final evaluation remains 13/32 exact lines and CER 4.33%; those metrics are not from the last-step checkpoint. Training loss first became nonfinite at step 18,159, and all training losses after step 18,745 are nonfinite. The step-20,000 last checkpoint contains 132 nonfinite model tensors. The continuation therefore reached the requested step counter but did not provide 20,000 healthy updates or a better selected model. See [audit evidence](docs/results/lines_only_continuation_audit.md).
 
+On 10 September 2026, a new lines-only diagnostic run started from scratch with
+the same baseline settings and explicit per-step loss, gradient and AMP
+monitoring. It completed 20,000 finite-loss steps without reproducing the
+failure. The selected checkpoint at step 11,648 achieved 15/32 exact lines and
+3.35% CER (24 edits on 716 characters) on the final set. Because this rerun was
+performed after the final-set comparisons, it is supplementary diagnostic
+evidence rather than a replacement for the historical table. See the
+[diagnostic rerun report](docs/results/lines_only_diagnostic_rerun.md).
+
 ## Best checkpoint
 
 The strongest checkpoint on the final test is the lines-plus-words model continued to 20,000 steps:

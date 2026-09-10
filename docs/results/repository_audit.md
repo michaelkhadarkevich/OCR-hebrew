@@ -102,6 +102,21 @@ Correction: the evaluator searches recursively, matching the training loader's b
 
 The numerical root cause of the late lines-only baseline failure remains undiagnosed. The existing AdamW training loop can still record nonfinite losses; a future training run needs explicit numerical monitoring. New page-disjoint validation would require retraining and would define a new experiment. A full corrected paper-style comparison also requires fresh training. Neither outcome can be obtained by editing a summary or replotting old logs.
 
+### Post-audit diagnostic rerun (10 September 2026)
+
+A fresh lines-only baseline run added explicit per-step loss, gradient and AMP
+monitoring and completed all 20,000 steps without reproducing the historical
+nonfinite loss. Its selected step was 11,648; final evaluation produced 24/716
+edit errors (3.35% CER) and 15/32 exact lines. The last checkpoint contained no
+nonfinite tensors. Eleven gradient overflows were recorded and handled by AMP
+without a nonfinite loss.
+
+This narrows the finding to a non-reproducible historical failure; it does not
+identify the cause. The rerun was evaluated after repeated use of the final set
+and remains supplementary diagnostic evidence. Full details and
+machine-readable values are in the
+[diagnostic rerun report](lines_only_diagnostic_rerun.md).
+
 Recheck the public figures on the training machine:
 
 ```powershell
