@@ -8,6 +8,132 @@ This repository adapts the official [HTR-VT](https://github.com/Intellindust-AI-
 
 The base source was compared with upstream commit `f21bf20` (22 January 2026). The Hebrew data pipeline, manual annotation interface, experiment runners, resumable checkpoints, evaluation scripts and plots are our additions. Curated data that was already committed remains available in the repository; newly generated local data, model checkpoints and run outputs are excluded from Git.
 
+## Quick start: running the experiments
+
+This section is intended for a teacher, reviewer or collaborator who clones the repository and wants to reproduce the main training/evaluation workflow.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/michaelkhadarkevich/OCR-hebrew.git
+cd OCR-hebrew
+```
+
+### 2. Create a Python environment
+
+On Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+```
+
+On Linux/macOS:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+Install PyTorch first. Choose the wheel that matches the local CUDA/CPU setup. For example, on a CUDA 12.8 Windows machine:
+
+```powershell
+python -m pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+```
+
+Then install the project dependencies:
+
+```bash
+python -m pip install -r requirements-hebrew.txt
+```
+
+Check that Python can see PyTorch:
+
+```bash
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+Full training is expected to use a CUDA GPU. CPU is enough for quick import and script checks, but it is not practical for full 20,000-step experiments.
+
+### 3. Verify the repository layout
+
+The data is organized as:
+
+```text
+data/
+  train/      # training datasets
+  valid/      # validation/checkpoint-selection lines
+  test/       # final held-out test lines
+  manifests/  # persistent word-level split manifests
+```
+
+Before training, make sure the main scripts load correctly:
+
+```bash
+python train_words_3000.py --help
+python scripts/evaluation/evaluate_line_folder.py --help
+python scripts/evaluation/evaluate_fixed_test.py --help
+```
+
+### 4. Run the main experiment script
+
+The paper-style runner launches the words-only, lines-only and combined experiments. It uses `data/train` for training, `data/valid` for checkpoint selection and `data/test` for final evaluation.
+
+On Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\runs\run_paper_recipe_experiments.ps1 -OutputRoot .\output\paper_recipe
+```
+
+This creates experiment folders under `output/paper_recipe/`. The `output/` folder is ignored by Git because it contains checkpoints, metrics and plots.
+
+### 5. Train one custom run manually
+
+For a single words-only run using the default word datasets in `data/train`:
+
+```bash
+python train_words_3000.py --steps 20000 --out-dir output/my_words_run
+```
+
+For explicit line training, pass training folders and the validation/test splits:
+
+```bash
+python train_words_3000.py \
+  --train-dirs data/train/arielManual data/train/RockManual data/train/AgadaManual data/train/HarmonitManualTrain \
+  --test-dir data/valid \
+  --final-test-dir data/test \
+  --strip-whitespace \
+  --width 1024 --height 64 \
+  --steps 20000 \
+  --out-dir output/my_lines_run
+```
+
+For mixed line+word training, include both line and word folders in `--train-dirs`.
+
+### 6. Evaluate a trained checkpoint
+
+After training, evaluate the selected checkpoint on the final test set:
+
+```bash
+python scripts/evaluation/evaluate_line_folder.py \
+  --checkpoint output/my_lines_run/run/best_model.pth \
+  --data-dir data/test \
+  --output-dir output/my_lines_run_test
+```
+
+The evaluation output folder will contain files such as `predictions.csv` and `summary.json`.
+
+### 7. Reproducing the reported comparison
+
+The historical reported comparison used three main training granularities:
+
+1. words only;
+2. lines only;
+3. lines + words.
+
+Checkpoints and large output folders are not committed to Git. If a reviewer wants to evaluate an existing model, they need the corresponding `.pth` checkpoint file. If no checkpoint is provided, they can train a new model using the commands above.
 ## Model and Hebrew preprocessing
 
 The recognition flow is:
