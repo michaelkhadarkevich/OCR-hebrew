@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import torch
-from data import dataset
+from htr_data import dataset
 from model import HTR_VT
 
 ds = dataset.myLoadDS('data/omer/train.ln', 'data/omer/lines/', [512, 64])

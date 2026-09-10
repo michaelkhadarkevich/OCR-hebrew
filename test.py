@@ -6,7 +6,7 @@ import json
 import valid
 from utils import utils
 from utils import option
-from data import dataset
+from htr_data import dataset
 from model import HTR_VT
 from collections import OrderedDict
 
@@ -66,4 +66,3 @@ def main():
 if __name__ == '__main__':
     args = option.get_args_parser()
     main()
-

@@ -9,7 +9,7 @@ import valid
 from utils import utils
 from utils import sam
 from utils import option
-from data import dataset
+from htr_data import dataset
 from model import HTR_VT
 from functools import partial
 

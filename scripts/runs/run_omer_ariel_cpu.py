@@ -13,7 +13,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from data import dataset
+from htr_data import dataset
 from model import HTR_VT
 from utils import utils
 

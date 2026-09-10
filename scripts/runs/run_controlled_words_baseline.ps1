@@ -5,10 +5,10 @@ $trainer = ".\train_words_3000.py"
 $outputDirectory = ".\output\controlled_baseline_words_only_20000"
 $targetSteps = 20000
 $trainingDirectories = @(
-    ".\data\arielOnlyWord",
-    ".\data\RockOnlyWord",
-    ".\data\agadaOnlyWord",
-    ".\data\HarmonitManualTrainOnlyWord"
+    ".\data\train\arielOnlyWord",
+    ".\data\train\RockOnlyWord",
+    ".\data\train\agadaOnlyWord",
+    ".\data\train\HarmonitManualTrainOnlyWord"
 )
 $common = @(
     "--steps", "$targetSteps",
@@ -26,8 +26,8 @@ $common = @(
     "--mask-ratio", "0",
     "--rotation-degrees", "2.0",
     "--rotation-probability", "0.5",
-    "--test-dir", ".\data\HarmonitManualTest",
-    "--final-test-dir", ".\data\HarmonitManualFinalTest",
+    "--test-dir", ".\data\valid\HarmonitManualTest",
+    "--final-test-dir", ".\data\test\HarmonitManualFinalTest",
     "--strip-whitespace"
 )
 

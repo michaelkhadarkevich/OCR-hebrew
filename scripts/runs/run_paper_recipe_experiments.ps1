@@ -24,8 +24,8 @@ $common = @(
     "--max-span-length", "8",
     "--paper-augmentation",
     "--paper-augmentation-probability", "0.5",
-    "--test-dir", ".\data\HarmonitManualTest",
-    "--final-test-dir", ".\data\HarmonitManualFinalTest",
+    "--test-dir", ".\data\valid\HarmonitManualTest",
+    "--final-test-dir", ".\data\test\HarmonitManualFinalTest",
     "--strip-whitespace"
 )
 
@@ -73,16 +73,16 @@ function Run-Experiment {
 }
 
 $wordDirectories = @(
-    ".\data\arielOnlyWord",
-    ".\data\RockOnlyWord",
-    ".\data\agadaOnlyWord",
-    ".\data\HarmonitManualTrainOnlyWord"
+    ".\data\train\arielOnlyWord",
+    ".\data\train\RockOnlyWord",
+    ".\data\train\agadaOnlyWord",
+    ".\data\train\HarmonitManualTrainOnlyWord"
 )
 $lineDirectories = @(
-    ".\data\arielManual",
-    ".\data\RockManual",
-    ".\data\AgadaManual",
-    ".\data\HarmonitManualTrain"
+    ".\data\train\arielManual",
+    ".\data\train\RockManual",
+    ".\data\train\AgadaManual",
+    ".\data\train\HarmonitManualTrain"
 )
 
 $wordsOutput = Join-Path $OutputRoot "paper_recipe_words_only_20000"

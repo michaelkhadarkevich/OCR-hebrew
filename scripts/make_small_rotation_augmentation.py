@@ -1,9 +1,9 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Create a small-rotation augmentation copy of OCR/HTR image+txt pairs.
 
 Default behavior matches the project layout used for Hebrew HTR training:
-  input:  data/arielManual, data/RockManual, data/AgadaManual
+  input:  data/train/arielManual, data/train/RockManual, data/train/AgadaManual
   output: data/train_small_rotation_YYYYMMDD/<dataset-name>/
 
 For every image that has a matching .txt label, the script writes one rotated

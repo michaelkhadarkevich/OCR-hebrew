@@ -25,17 +25,17 @@ except Exception:
         def __call__(self, image):
             return image
 
-from data import transform as paper_transform
+from htr_data import transform as paper_transform
 from model import HTR_VT
 from utils import sam as sam_utils
 from utils import utils
 
 
 DATASETS = (
-    "arielOnlyWord",
-    "agadaOnlyWord",
-    "RockOnlyWord",
-    "phisicsTigulOnlyWords",
+    "train/arielOnlyWord",
+    "train/agadaOnlyWord",
+    "train/RockOnlyWord",
+    "train/phisicsTigulOnlyWords",
 )
 
 TRAINING_RECIPE_VERSION = "global-cosine-bound-ema-v1"

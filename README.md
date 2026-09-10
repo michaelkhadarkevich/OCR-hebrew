@@ -41,9 +41,9 @@ python tools/segmentation/line_segmenter/server.py
 The scripts `verify_transcriptions.py`, `verify_training_batch.py` and `verify_visual_ltr.py` help detect missing pairs, empty or invalid UTF-8 labels, and wrong RTL orientation before training. They accept repository-relative dataset paths and do not rely on machine-specific directories:
 
 ```powershell
-python verify_transcriptions.py data/HarmonitManualTrain data/HarmonitManualTrainOnlyWord
-python verify_training_batch.py data/HarmonitManualTrain --strip-whitespace
-python verify_visual_ltr.py data/HarmonitManualTrain --output output/rtl_preview.png
+python verify_transcriptions.py data/train/HarmonitManualTrain data/train/HarmonitManualTrainOnlyWord
+python verify_training_batch.py data/train/HarmonitManualTrain --strip-whitespace
+python verify_visual_ltr.py data/train/HarmonitManualTrain --output output/rtl_preview.png
 ```
 
 Main folders used by the experiments:
@@ -120,7 +120,7 @@ Evaluate a selected checkpoint on the final line set:
 ```powershell
 python scripts/evaluation/evaluate_line_folder.py `
   --checkpoint output/<run>/run/best_model.pth `
-  --data-dir data/HarmonitManualFinalTest `
+  --data-dir data/test/HarmonitManualFinalTest `
   --output-dir output/<run>_final
 ```
 

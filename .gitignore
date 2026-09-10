@@ -1,7 +1,7 @@
 data/*
 !data/*.py
-!data/phisicsTigulOnlyWords/
-!data/phisicsTigulOnlyWords/**
+!data/train/phisicsTigulOnlyWords/
+!data/train/phisicsTigulOnlyWords/**
 output/
 *.pth
 *.pt

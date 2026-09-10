@@ -6,7 +6,7 @@ import itertools
 from PIL import Image
 from torch.utils.data import Dataset
 from utils import utils
-from data import transform as transform
+from htr_data import transform as transform
 try:
     from torchvision.transforms import ColorJitter
 except Exception:

@@ -11,7 +11,7 @@ import editdistance
 import torch
 from torch.utils.data import DataLoader
 
-from data import dataset
+from htr_data import dataset
 from model import HTR_VT
 from utils import utils
 

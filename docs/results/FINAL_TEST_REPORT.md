@@ -6,7 +6,7 @@ All three checkpoints in the central baseline comparison were evaluated again on
 
 ## Evaluation protocol
 
-All saved HTR checkpoints were compared on the held-out dataset at `data/HarmonitManualFinalTest`. It contains 32 labeled text lines from pages that were not used for training or checkpoint selection.
+All saved HTR checkpoints were compared on the held-out dataset at `data/test/HarmonitManualFinalTest`. It contains 32 labeled text lines from pages that were not used for training or checkpoint selection.
 
 This report covers the historical baseline checkpoint scan, not every later paper-style or interrupted experiment. Checkpoint steps were selected on validation data, but the final set has been used to compare multiple configurations retrospectively. Calling one configuration the best is therefore an exploratory comparison, not an independent once-only estimate for a configuration chosen before testing.
 
@@ -103,7 +103,7 @@ Evaluate any selected checkpoint with:
 ```powershell
 python scripts/evaluation/evaluate_line_folder.py `
   --checkpoint output/<run>/run/best_model.pth `
-  --data-dir data/HarmonitManualFinalTest `
+  --data-dir data/test/HarmonitManualFinalTest `
   --output-dir output/<run>_final
 ```
 
