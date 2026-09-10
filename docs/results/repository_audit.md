@@ -62,7 +62,7 @@ Correction: the README identifies this as a separate incomplete experiment. No g
 
 ### 6. Some historical runs used different data or evaluation splits
 
-The regularized run used 12 validation lines sampled from `HarmonitManualTrain`, 1,426 training samples, and stopped at step 2,040. Its historical summary's `final_test_cer` was calculated on `HarmonitManualTest`, not the later final set. The report's regularized row correctly uses the separate `HarmonitManualFinalTest` evaluation: 15/32 exact, CER 4.33%.
+The regularized run used 12 validation lines sampled from `HarmonitManualTrain`, 1,426 training samples, and stopped at step 2,040. Its historical summary's `final_test_cer` was calculated on `ManualTest`, not the later final set. The report's regularized row correctly uses the separate `ManualFinalTest` evaluation: 15/32 exact, CER 4.33%.
 
 Four early word-run manifests (`hebrew_words_3000`, `hebrew_words_10000`, `hebrew_words_10000_rotation`, and `hebrew_words_10000_rotation_cleaned`) no longer exactly match current data. The first three each reference six missing image paths and 13 changed label paths; the cleaned run has eight changed label paths and no missing paths. This is historical data drift, not a reason to alter the current transcriptions. All three central run manifests match current data.
 
@@ -87,7 +87,7 @@ Correction: the relevant README/report passages and an `img/README.md` now expla
 
 ### 8. The line evaluator missed nested datasets
 
-`evaluate_line_folder.py` previously searched only the top directory for PNGs. The final set is flat, so its published evaluations were unaffected, but `HarmonitManualTest` stores images in subdirectories. Evaluating that folder would report no pairs.
+`evaluate_line_folder.py` previously searched only the top directory for PNGs. The final set is flat, so its published evaluations were unaffected, but `ManualTest` stores images in subdirectories. Evaluating that folder would report no pairs.
 
 Correction: the evaluator searches recursively, matching the training loader's behavior. Fresh validation evaluation found all 32 samples. Final-set inference on the three central checkpoints reproduced the prior metrics.
 

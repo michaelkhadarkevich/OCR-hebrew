@@ -614,7 +614,7 @@
       "bad_utf8": 0
     },
     {
-      "folder": "HarmonitManualFinalTest",
+      "folder": "ManualFinalTest",
       "png": 32,
       "txt": 32,
       "tracked_png": 32,
@@ -624,7 +624,7 @@
       "bad_utf8": 0
     },
     {
-      "folder": "HarmonitManualTest",
+      "folder": "ManualTest",
       "png": 32,
       "txt": 32,
       "tracked_png": 32,

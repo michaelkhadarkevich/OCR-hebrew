@@ -26,8 +26,8 @@ $common = @(
     "--mask-ratio", "0",
     "--rotation-degrees", "2.0",
     "--rotation-probability", "0.5",
-    "--test-dir", ".\data\valid\HarmonitManualTest",
-    "--final-test-dir", ".\data\test\HarmonitManualFinalTest",
+    "--test-dir", ".\data\valid\ManualTest",
+    "--final-test-dir", ".\data\test\ManualFinalTest",
     "--strip-whitespace"
 )
 

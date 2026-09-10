@@ -50,8 +50,8 @@ Main folders used by the experiments:
 
 - lines: `arielManual`, `RockManual`, `AgadaManual`, `HarmonitManualTrain`;
 - words: `arielOnlyWord`, `RockOnlyWord`, `agadaOnlyWord`, `HarmonitManualTrainOnlyWord`;
-- validation/checkpoint selection: `HarmonitManualTest`;
-- final evaluation only: `HarmonitManualFinalTest` (32 lines).
+- validation/checkpoint selection: `ManualTest`;
+- final evaluation only: `ManualFinalTest` (32 lines).
 
 The central runs select checkpoint steps on validation CER; final-test labels are excluded from their model alphabet. The final set was used to compare multiple trained configurations retrospectively, so the best final-test result is exploratory rather than a once-only test of a preselected winning configuration.
 
@@ -120,7 +120,7 @@ Evaluate a selected checkpoint on the final line set:
 ```powershell
 python scripts/evaluation/evaluate_line_folder.py `
   --checkpoint output/<run>/run/best_model.pth `
-  --data-dir data/test/HarmonitManualFinalTest `
+  --data-dir data/test/ManualFinalTest `
   --output-dir output/<run>_final
 ```
 
